@@ -50,4 +50,19 @@ public class UserManager {
         }
         return false;
     }
+
+    public int getUserId(String username) {
+        String sql = "SELECT id FROM users WHERE username = ?";
+        try (Connection connection = connect();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, username);
+            ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next()) {
+                return resultSet.getInt("id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return -1; // Return -1 or another indicator for not found/invalid
+    }
 }

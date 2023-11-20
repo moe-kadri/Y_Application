@@ -14,12 +14,14 @@ public class YServer {
         int port = Integer.parseInt(args[0]);
 
         // Database connection details
-        String jdbcURL = "jdbc:mysql://localhost/Y:3306";
+        String jdbcURL = "jdbc:mysql://localhost/Y:3306"; // Ensure this URL is correct
         String jdbcUsername = "root";
-        String jdbcPassword = "kali";
+        String jdbcPassword = "kali"; // Be cautious with passwords in source code
 
-        // Create an instance of UserManager
+        // Create instances of UserManager, MessageManager, and FollowManager
         UserManager userManager = new UserManager(jdbcURL, jdbcUsername, jdbcPassword);
+        MessageManager messageManager = new MessageManager(jdbcURL, jdbcUsername, jdbcPassword);
+        FollowManager followManager = new FollowManager(jdbcURL, jdbcUsername, jdbcPassword);
 
         // Start the server and listen for client connections
         try (ServerSocket serverSocket = new ServerSocket(port)) {
@@ -27,8 +29,9 @@ public class YServer {
             while (true) {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("New client connected");
-                // Create a new thread for each client
-                new ClientHandler(clientSocket, userManager).start();
+
+                // Create a new ClientHandler thread for each client
+                new ClientHandler(clientSocket, userManager, messageManager, followManager).start();
             }
         } catch (IOException e) {
             System.err.println("Server exception: " + e.getMessage());
