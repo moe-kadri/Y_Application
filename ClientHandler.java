@@ -299,13 +299,14 @@ class PostMessageResponse implements Serializable {
 
 class FollowRequest implements Serializable {
     private int followerId;
-    private int followedId;
+    private int followedId; // Changed from followedUsername to followedId
+    private String followedUsername; // Changed from followedId to followedUsername
     private boolean isFollow; // true for follow, false for unfollow
 
     // Constructor
-    public FollowRequest(int followerId, int followedId, boolean isFollow) {
+    public FollowRequest(int followerId, String followedUsername, boolean isFollow) {
         this.followerId = followerId;
-        this.followedId = followedId;
+        this.followedUsername = followedUsername;
         this.isFollow = isFollow;
     }
 
