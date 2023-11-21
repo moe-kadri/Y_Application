@@ -14,7 +14,7 @@ public class YServer {
         int port = Integer.parseInt(args[0]);
 
         // Database connection details
-        String jdbcURL = "jdbc:mysql://localhost/Y:3306"; // Ensure this URL is correct
+        String jdbcURL = "jdbc:mysql://localhost:3306/Y"; // Ensure this URL is correct
         String jdbcUsername = "root";
         String jdbcPassword = "kali"; // Be cautious with passwords in source code
 

@@ -70,5 +70,24 @@ public class MessageManager {
         }
         return feed;
     }
+
+    public List<String> getMessagesOfInterest(int userId) {
+        List<String> messagesOfInterest = new ArrayList<>();
+        String sql = "SELECT content FROM messages WHERE user_id IN (SELECT followed_id FROM followers WHERE follower_id = ?)";
+
+        try (Connection connection = connect();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, userId);
+            ResultSet resultSet = statement.executeQuery();
+
+            while (resultSet.next()) {
+                messagesOfInterest.add(resultSet.getString("content"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return messagesOfInterest;
+    }
 }
 

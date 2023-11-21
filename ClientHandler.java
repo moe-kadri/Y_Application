@@ -1,3 +1,4 @@
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -7,6 +8,8 @@ import java.io.Serializable;
 
 public class ClientHandler extends Thread {
     private Socket clientSocket;
+    private ObjectInputStream input;
+    private ObjectOutputStream output;
     private UserManager userManager;
     private MessageManager messageManager;
     private FollowManager followManager;
@@ -19,35 +22,40 @@ public class ClientHandler extends Thread {
         this.followManager = followManager;
     }
 
+    @Override
     public void run() {
-        try (ObjectInputStream input = new ObjectInputStream(clientSocket.getInputStream());
-             ObjectOutputStream output = new ObjectOutputStream(clientSocket.getOutputStream())) {
+        try {
+            output = new ObjectOutputStream(clientSocket.getOutputStream());
+            input = new ObjectInputStream(clientSocket.getInputStream());
 
-            Object request = input.readObject();
+            while (true) {
+                Object request = input.readObject();
 
-            if (request instanceof RegistrationRequest) {
-                RegistrationRequest regRequest = (RegistrationRequest) request;
-                handleRegistration(regRequest, output);
-            } else if (request instanceof LoginRequest) {
-                LoginRequest loginRequest = (LoginRequest) request;
-                handleLogin(loginRequest, output);
-            } else if (request instanceof PostMessageRequest) {
-                PostMessageRequest messageRequest = (PostMessageRequest) request;
-                handlePostMessage(messageRequest, output);
-            } else if (request instanceof FollowRequest) {
-                FollowRequest followRequest = (FollowRequest) request;
-                handleFollowRequest(followRequest, output);
+                if (request instanceof RegistrationRequest) {
+                    handleRegistration((RegistrationRequest) request);
+                } else if (request instanceof LoginRequest) {
+                    handleLogin((LoginRequest) request);
+                } else if (request instanceof PostMessageRequest) {
+                    handlePostMessage((PostMessageRequest) request);
+                } else if (request instanceof FollowRequest) {
+                    handleFollowRequest((FollowRequest) request);
+                }
+                // Add handling for other request types
             }
-
-            // Handle other types of requests if necessary
-
-        } catch (IOException | ClassNotFoundException e) {
-            System.err.println("ClientHandler exception: " + e.getMessage());
+        } catch (EOFException e) {
+            System.err.println("Connection terminated: " + e.getMessage());
+        } catch (IOException e) {
+            System.err.println("ClientHandler IOException: " + e.getMessage());
             e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            System.err.println("Class not found: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            closeConnections();
         }
     }
 
-    private void handleRegistration(RegistrationRequest request, ObjectOutputStream output) throws IOException {
+    private void handleRegistration(RegistrationRequest request) throws IOException {
         boolean success = userManager.registerUser(
             request.getUsername(), 
             request.getPassword(), 
@@ -57,50 +65,71 @@ public class ClientHandler extends Thread {
         String message = success ? "Registration successful" : "Registration failed";
         output.writeObject(new RegistrationResponse(success, message));
     }
+    
 
-    private void handleLogin(LoginRequest request, ObjectOutputStream output) throws IOException {
-        boolean authenticated = userManager.authenticateUser(
-            request.getUsername(), 
-            request.getPassword()
-        );
-        
-        LoginResponse response;
+    private void handleLogin(LoginRequest request) throws IOException {
+        boolean authenticated = userManager.authenticateUser(request.getUsername(), request.getPassword());
+        int userId = authenticated ? userManager.getUserId(request.getUsername()) : -1;
+        LoginResponse response = new LoginResponse(authenticated, "Login " + (authenticated ? "successful" : "failed"), userId);
+        output.writeObject(response);
+    
         if (authenticated) {
-            response = new LoginResponse(true, "Login successful");
-            output.writeObject(response);
-            sendUserMessages(request.getUsername(), output);
-        } else {
-            response = new LoginResponse(false, "Login failed");
-            output.writeObject(response);
+            sendUserMessages(userId);
         }
     }
+    
+    
 
-    private void handlePostMessage(PostMessageRequest request, ObjectOutputStream output) throws IOException {
+    private void handlePostMessage(PostMessageRequest request) throws IOException {
         boolean success = messageManager.postMessage(request.getUserId(), request.getContent());
         String message = success ? "Message posted successfully" : "Failed to post message";
-        output.writeObject(new PostMessageResponse(success, message));
+        PostMessageResponse postMessageResponse = new PostMessageResponse(success, message);
+        output.writeObject(postMessageResponse);
     }
+    
+    
 
-    private void handleFollowRequest(FollowRequest request, ObjectOutputStream output) throws IOException {
+    private void handleFollowRequest(FollowRequest request) throws IOException {
         boolean success;
+        String message;
         if (request.isFollow()) {
             success = followManager.followUser(request.getFollowerId(), request.getFollowedId());
+            message = success ? "Followed successfully" : "Failed to follow";
         } else {
             success = followManager.unfollowUser(request.getFollowerId(), request.getFollowedId());
+            message = success ? "Unfollowed successfully" : "Failed to unfollow";
         }
-        String message = success ? "Operation successful" : "Operation failed";
         output.writeObject(new FollowResponse(success, message));
     }
+    
+    
+    
 
-    private void sendUserMessages(String username, ObjectOutputStream output) throws IOException {
-        int userId = userManager.getUserId(username);
-        
+    private void sendUserMessages(int userId) throws IOException {
         List<String> userMessages = messageManager.getMessagesByUser(userId);
-        output.writeObject(userMessages); // Send the user's messages
-
-        List<String> feedMessages = messageManager.getFeedForUser(userId);
-        output.writeObject(feedMessages); // Send the messages of interest
+        List<String> messagesOfInterest = messageManager.getMessagesOfInterest(userId);
+        output.writeObject(userMessages);
+        output.writeObject(messagesOfInterest);
     }
+
+    private void closeConnections() {
+        try {
+            if (input != null) {
+                input.close();
+            }
+            if (output != null) {
+                output.close();
+            }
+            if (clientSocket != null && !clientSocket.isClosed()) {
+                clientSocket.close();
+            }
+        } catch (IOException e) {
+            System.err.println("Error closing connections: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    
 
     // Additional methods as needed
 }
@@ -184,12 +213,12 @@ class RegistrationResponse implements Serializable {
 class LoginResponse implements Serializable {
     private boolean success;
     private String message;
-    // Include additional fields as needed, e.g., user details
+    private int userId; // User ID
 
-    // Constructor
-    public LoginResponse(boolean success, String message) {
+    public LoginResponse(boolean success, String message, int userId) {
         this.success = success;
         this.message = message;
+        this.userId = userId;
     }
 
     // Getters
@@ -201,8 +230,13 @@ class LoginResponse implements Serializable {
         return message;
     }
 
-    // Additional getters for any other user-specific fields
+    public int getUserId() {
+        return userId;
+    }
+    
+    // Setters if needed
 }
+
 
 
 class PostMessageRequest implements Serializable {
