@@ -92,15 +92,23 @@ public class ClientHandler extends Thread {
     private void handleFollowRequest(FollowRequest request) throws IOException {
         boolean success;
         String message;
-        if (request.isFollow()) {
-            success = followManager.followUser(request.getFollowerId(), request.getFollowedId());
-            message = success ? "Followed successfully" : "Failed to follow";
+    
+        int followedUserId = userManager.getUserId(request.getFollowedUsername());
+        if (followedUserId == -1) {
+            success = false;
+            message = "User not found: " + request.getFollowedUsername();
+        } else if (request.isFollow()) {
+            success = followManager.followUser(request.getFollowerId(), followedUserId);
+            message = success ? "You are now following " + request.getFollowedUsername() : "Failed to follow " + request.getFollowedUsername();
         } else {
-            success = followManager.unfollowUser(request.getFollowerId(), request.getFollowedId());
-            message = success ? "Unfollowed successfully" : "Failed to unfollow";
+            success = followManager.unfollowUser(request.getFollowerId(), followedUserId);
+            message = success ? "You unfollowed " + request.getFollowedUsername() : "Failed to unfollow " + request.getFollowedUsername();
         }
+    
         output.writeObject(new FollowResponse(success, message));
     }
+    
+    
     
     
     
@@ -321,6 +329,10 @@ class FollowRequest implements Serializable {
 
     public boolean isFollow() {
         return isFollow;
+    }
+
+    public String getFollowedUsername() {
+        return followedUsername;
     }
 
     // Setters, if you need to modify the fields after object creation

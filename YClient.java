@@ -159,6 +159,8 @@ public class YClient {
                 handleLoginResponse((LoginResponse) response);
             } else if (response instanceof PostMessageResponse) {
                 handlePostMessageResponse((PostMessageResponse) response);
+            } else if (response instanceof FollowResponse) {
+                handleFollowResponse((FollowResponse) response);
             }
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
@@ -244,6 +246,10 @@ public class YClient {
         FollowRequest request = new FollowRequest(userId, usernameToUnfollow, false);
         sendRequest(request);
         // Handle the response
+    }
+    
+    private void handleFollowResponse(FollowResponse response) {
+        JOptionPane.showMessageDialog(frame, response.getMessage(), "Follow Status", JOptionPane.INFORMATION_MESSAGE);
     }
     
     
