@@ -181,7 +181,7 @@ public class YClient {
     
             try {
                 List<String> userMessages = (List<String>) inputStream.readObject();
-                List<String> messagesOfInterest = (List<String>) inputStream.readObject();
+                List<Message> messagesOfInterest = (List<Message>) inputStream.readObject();
                 showPostLoginUI(userMessages, messagesOfInterest); // Pass messages to showPostLoginUI
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
@@ -190,12 +190,15 @@ public class YClient {
         }
     }
     
-
-    private void updateMessagesDisplay(List<String> userMessages, List<String> messagesOfInterest) {
-        System.out.println("Updating messages display"); // Debugging
+    
+    private void updateMessagesDisplay(List<String> userMessages, List<Message> messagesOfInterest) {
         JTextArea textArea = new JTextArea();
+    
         userMessages.forEach(msg -> textArea.append("Your Message: " + msg + "\n"));
-        messagesOfInterest.forEach(msg -> textArea.append("Message of Interest: " + msg + "\n"));
+    
+        for (Message msg : messagesOfInterest) {
+            textArea.append("Message from " + msg.getUsername() + ": " + msg.getContent() + "\n");
+        }
     
         if (userMessages.isEmpty() && messagesOfInterest.isEmpty()) {
             textArea.setText("No messages to display.");
@@ -205,11 +208,18 @@ public class YClient {
         JPanel messagePanel = new JPanel(new BorderLayout());
         messagePanel.add(scrollPane, BorderLayout.CENTER);
     
-        frame.getContentPane().removeAll(); // Clear previous content
+        frame.getContentPane().removeAll();
         frame.getContentPane().add(messagePanel, BorderLayout.CENTER);
         frame.revalidate();
         frame.repaint();
     }
+    
+    
+    
+    
+    
+
+    
     
     
     private void handlePostMessageResponse(PostMessageResponse response) {
@@ -217,7 +227,7 @@ public class YClient {
     }   
 
 
-    private void showPostLoginUI(List<String> userMessages, List<String> messagesOfInterest) {
+    private void showPostLoginUI(List<String> userMessages, List<Message> messagesOfInterest) {
         frame.getContentPane().removeAll();
         frame.setLayout(new BorderLayout());
     

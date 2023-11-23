@@ -115,7 +115,7 @@ public class ClientHandler extends Thread {
 
     private void sendUserMessages(int userId) throws IOException {
         List<String> userMessages = messageManager.getMessagesByUser(userId);
-        List<String> messagesOfInterest = messageManager.getMessagesOfInterest(userId);
+        List<Message> messagesOfInterest = messageManager.getMessagesOfInterest(userId);
         output.writeObject(userMessages);
         output.writeObject(messagesOfInterest);
     }
@@ -377,3 +377,22 @@ class FollowResponse implements Serializable {
         this.message = message;
     }
 }
+
+class Message implements Serializable {
+    private final String username;
+    private final String content;
+
+    public Message(String username, String content) {
+        this.username = username;
+        this.content = content;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getContent() {
+        return content;
+    }
+}
+
