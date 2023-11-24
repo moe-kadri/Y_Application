@@ -16,7 +16,7 @@ public class YServer {
         // Database connection details
         String jdbcURL = "jdbc:mysql://localhost:3306/Y"; // Ensure this URL is correct
         String jdbcUsername = "root";
-        String jdbcPassword = "kali"; // Be cautious with passwords in source code
+        String jdbcPassword = "DBMavericks33"; // Be cautious with passwords in source code
 
         // Create instances of UserManager, MessageManager, and FollowManager
         UserManager userManager = new UserManager(jdbcURL, jdbcUsername, jdbcPassword);

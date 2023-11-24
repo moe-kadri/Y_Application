@@ -22,13 +22,13 @@ public class UserManager {
     public boolean registerUser(String username, String password, String name, String email) {
         String sql = "INSERT INTO users (username, password, name, email) VALUES (?, ?, ?, ?)";
         try (Connection connection = connect();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, username);
             statement.setString(2, password); // Ideally, hash the password
             statement.setString(3, name);
             statement.setString(4, email);
             statement.executeUpdate();
-            return true;  // Return true on successful registration
+            return true; // Return true on successful registration
         } catch (SQLException e) {
             e.printStackTrace();
             return false; // Return false if an exception occurs
@@ -38,7 +38,7 @@ public class UserManager {
     public boolean authenticateUser(String username, String password) {
         String sql = "SELECT password FROM users WHERE username = ?";
         try (Connection connection = connect();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, username);
             ResultSet resultSet = statement.executeQuery();
             if (resultSet.next()) {
@@ -54,7 +54,7 @@ public class UserManager {
     public int getUserId(String username) {
         String sql = "SELECT id FROM users WHERE username = ?";
         try (Connection connection = connect();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, username);
             ResultSet resultSet = statement.executeQuery();
             if (resultSet.next()) {

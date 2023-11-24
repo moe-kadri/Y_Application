@@ -15,7 +15,8 @@ public class ClientHandler extends Thread {
     private FollowManager followManager;
 
     // Constructor
-    public ClientHandler(Socket socket, UserManager userManager, MessageManager messageManager, FollowManager followManager) {
+    public ClientHandler(Socket socket, UserManager userManager, MessageManager messageManager,
+            FollowManager followManager) {
         this.clientSocket = socket;
         this.userManager = userManager;
         this.messageManager = messageManager;
@@ -39,6 +40,8 @@ public class ClientHandler extends Thread {
                     handlePostMessage((PostMessageRequest) request);
                 } else if (request instanceof FollowRequest) {
                     handleFollowRequest((FollowRequest) request);
+                } else if (request instanceof RefreshFeedRequest) {
+                    handleRefreshFeed((RefreshFeedRequest) request);
                 }
                 // Add handling for other request types
             }
@@ -57,28 +60,30 @@ public class ClientHandler extends Thread {
 
     private void handleRegistration(RegistrationRequest request) throws IOException {
         boolean success = userManager.registerUser(
-            request.getUsername(), 
-            request.getPassword(), 
-            request.getName(), 
-            request.getEmail()
-        );
+                request.getUsername(),
+                request.getPassword(),
+                request.getName(),
+                request.getEmail());
         String message = success ? "Registration successful" : "Registration failed";
         output.writeObject(new RegistrationResponse(success, message));
     }
-    
 
     private void handleLogin(LoginRequest request) throws IOException {
         boolean authenticated = userManager.authenticateUser(request.getUsername(), request.getPassword());
         int userId = authenticated ? userManager.getUserId(request.getUsername()) : -1;
-        LoginResponse response = new LoginResponse(authenticated, "Login " + (authenticated ? "successful" : "failed"), userId);
+        LoginResponse response = new LoginResponse(authenticated, "Login " + (authenticated ? "successful" : "failed"),
+                userId);
         output.writeObject(response);
-    
+
         if (authenticated) {
-            sendUserMessages(userId);
+            sendUserMessages(userId, request.getUsername());
         }
     }
-    
-    
+
+    private void handleRefreshFeed(RefreshFeedRequest request) throws IOException {
+        RefreshFeedResponse RefreshFeedMessages = messageManager.getRefreshFeed(request.getUserId(), request.getDate());
+        output.writeObject(RefreshFeedMessages);
+    }
 
     private void handlePostMessage(PostMessageRequest request) throws IOException {
         boolean success = messageManager.postMessage(request.getUserId(), request.getContent());
@@ -86,35 +91,30 @@ public class ClientHandler extends Thread {
         PostMessageResponse postMessageResponse = new PostMessageResponse(success, message);
         output.writeObject(postMessageResponse);
     }
-    
-    
 
     private void handleFollowRequest(FollowRequest request) throws IOException {
         boolean success;
         String message;
-    
+
         int followedUserId = userManager.getUserId(request.getFollowedUsername());
         if (followedUserId == -1) {
             success = false;
             message = "User not found: " + request.getFollowedUsername();
         } else if (request.isFollow()) {
             success = followManager.followUser(request.getFollowerId(), followedUserId);
-            message = success ? "You are now following " + request.getFollowedUsername() : "Failed to follow " + request.getFollowedUsername();
+            message = success ? "You are now following " + request.getFollowedUsername()
+                    : "Failed to follow " + request.getFollowedUsername();
         } else {
             success = followManager.unfollowUser(request.getFollowerId(), followedUserId);
-            message = success ? "You unfollowed " + request.getFollowedUsername() : "Failed to unfollow " + request.getFollowedUsername();
+            message = success ? "You unfollowed " + request.getFollowedUsername()
+                    : "Failed to unfollow " + request.getFollowedUsername();
         }
-    
+
         output.writeObject(new FollowResponse(success, message));
     }
-    
-    
-    
-    
-    
 
-    private void sendUserMessages(int userId) throws IOException {
-        List<String> userMessages = messageManager.getMessagesByUser(userId);
+    private void sendUserMessages(int userId, String username) throws IOException {
+        List<Message> userMessages = messageManager.getMessagesByUser(userId, username);
         List<Message> messagesOfInterest = messageManager.getMessagesOfInterest(userId);
         output.writeObject(userMessages);
         output.writeObject(messagesOfInterest);
@@ -136,14 +136,9 @@ public class ClientHandler extends Thread {
             e.printStackTrace();
         }
     }
-    
-    
 
     // Additional methods as needed
 }
-
-
-
 
 class RegistrationRequest implements Serializable {
     private String username;
@@ -197,7 +192,6 @@ class LoginRequest implements Serializable {
     }
 }
 
-
 class RegistrationResponse implements Serializable {
     private boolean success;
     private String message;
@@ -241,11 +235,29 @@ class LoginResponse implements Serializable {
     public int getUserId() {
         return userId;
     }
-    
+
     // Setters if needed
 }
 
+class RefreshFeedResponse implements Serializable {
+    private boolean success;
+    private List<Message> messages;
 
+    public RefreshFeedResponse(boolean success, List<Message> messages) {
+        this.success = success;
+        this.messages = messages;
+    }
+
+    // Getters
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public List<Message> getMessages() {
+        return messages;
+    }
+
+}
 
 class PostMessageRequest implements Serializable {
     private int userId;
@@ -381,10 +393,12 @@ class FollowResponse implements Serializable {
 class Message implements Serializable {
     private final String username;
     private final String content;
+    private final String date;
 
-    public Message(String username, String content) {
+    public Message(String username, String content, String date) {
         this.username = username;
         this.content = content;
+        this.date = date;
     }
 
     public String getUsername() {
@@ -394,5 +408,38 @@ class Message implements Serializable {
     public String getContent() {
         return content;
     }
+
+    public String getDate() {
+        return date;
+    }
+
 }
 
+class RefreshFeedRequest implements Serializable {
+    private int userId;
+    private String date;
+
+    // Constructor
+    public RefreshFeedRequest(int userId, String date) {
+        this.userId = userId;
+        this.date = date;
+    }
+
+    // Getters
+    public int getUserId() {
+        return userId;
+    }
+
+    public String getDate() {
+        return date;
+    }
+
+    // Setters, if you need to modify the fields after object creation
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
+
+    public void setDate(String date) {
+        this.date = date;
+    }
+}
