@@ -73,11 +73,11 @@ public class ClientHandler extends Thread {
         int userId = authenticated ? userManager.getUserId(request.getUsername()) : -1;
         LoginResponse response = new LoginResponse(authenticated, "Login " + (authenticated ? "successful" : "failed"),
                 userId);
+        if (authenticated) {
+            AddMessagesLists(userId, request.getUsername(), response);
+        }
         output.writeObject(response);
 
-        if (authenticated) {
-            sendUserMessages(userId, request.getUsername());
-        }
     }
 
     private void handleRefreshFeed(RefreshFeedRequest request) throws IOException {
@@ -113,11 +113,11 @@ public class ClientHandler extends Thread {
         output.writeObject(new FollowResponse(success, message));
     }
 
-    private void sendUserMessages(int userId, String username) throws IOException {
+    private void AddMessagesLists(int userId, String username, LoginResponse res) throws IOException {
         List<Message> userMessages = messageManager.getMessagesByUser(userId, username);
         List<Message> messagesOfInterest = messageManager.getMessagesOfInterest(userId);
-        output.writeObject(userMessages);
-        output.writeObject(messagesOfInterest);
+        res.setUserMessages(userMessages);
+        res.setMessagesOfInterest(messagesOfInterest);
     }
 
     private void closeConnections() {
@@ -216,6 +216,16 @@ class LoginResponse implements Serializable {
     private boolean success;
     private String message;
     private int userId; // User ID
+    private List<Message> userMessages;
+    private List<Message> messagesOfInterest;
+
+    public List<Message> getUserMessages() {
+        return userMessages;
+    }
+
+    public List<Message> getMessagesOfInterest() {
+        return messagesOfInterest;
+    }
 
     public LoginResponse(boolean success, String message, int userId) {
         this.success = success;
@@ -236,7 +246,14 @@ class LoginResponse implements Serializable {
         return userId;
     }
 
-    // Setters if needed
+    public void setUserMessages(List<Message> userMessages) {
+        this.userMessages = userMessages;
+    }
+
+    public void setMessagesOfInterest(List<Message> messagesOfInterest) {
+        this.messagesOfInterest = messagesOfInterest;
+    }
+
 }
 
 class RefreshFeedResponse implements Serializable {

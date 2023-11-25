@@ -191,8 +191,8 @@ public class YClient {
             this.userId = response.getUserId();
 
             try {
-                List<Message> userMessages = (List<Message>) inputStream.readObject();
-                List<Message> messagesOfInterest = (List<Message>) inputStream.readObject();
+                List<Message> userMessages = response.getUserMessages();
+                List<Message> messagesOfInterest = response.getMessagesOfInterest();
                 showPostLoginUI(userMessages, messagesOfInterest);
                 if (messagesOfInterest.size() > 0)
                     LastRefreshed = new String(messagesOfInterest.get(messagesOfInterest.size() - 1).getDate());
