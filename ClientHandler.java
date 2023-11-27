@@ -3,6 +3,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
 import java.io.Serializable;
 
@@ -13,6 +14,8 @@ public class ClientHandler extends Thread {
     private UserManager userManager;
     private MessageManager messageManager;
     private FollowManager followManager;
+    Client client;
+    static List<Client> activeUsers = new ArrayList<Client>();
 
     // Constructor
     public ClientHandler(Socket socket, UserManager userManager, MessageManager messageManager,
@@ -42,8 +45,11 @@ public class ClientHandler extends Thread {
                     handleFollowRequest((FollowRequest) request);
                 } else if (request instanceof RefreshFeedRequest) {
                     handleRefreshFeed((RefreshFeedRequest) request);
+                } else if (request instanceof PostCommentRequest) {
+                    handlePostCommentRequest((PostCommentRequest) request);
+                } else if (request instanceof RetrieveCommentsRequest) {
+                    handleRetrieveCommentsRequest((RetrieveCommentsRequest) request);
                 }
-                // Add handling for other request types
             }
         } catch (EOFException e) {
             System.err.println("Connection terminated: " + e.getMessage());
@@ -54,6 +60,7 @@ public class ClientHandler extends Thread {
             System.err.println("Class not found: " + e.getMessage());
             e.printStackTrace();
         } finally {
+            activeUsers.remove(client);
             closeConnections();
         }
     }
@@ -72,12 +79,13 @@ public class ClientHandler extends Thread {
         boolean authenticated = userManager.authenticateUser(request.getUsername(), request.getPassword());
         int userId = authenticated ? userManager.getUserId(request.getUsername()) : -1;
         LoginResponse response = new LoginResponse(authenticated, "Login " + (authenticated ? "successful" : "failed"),
-                userId);
+                userId, request.getUsername());
         if (authenticated) {
             AddMessagesLists(userId, request.getUsername(), response);
         }
         output.writeObject(response);
-
+        client = new Client(userId, output);
+        activeUsers.add(client);
     }
 
     private void handleRefreshFeed(RefreshFeedRequest request) throws IOException {
@@ -86,10 +94,21 @@ public class ClientHandler extends Thread {
     }
 
     private void handlePostMessage(PostMessageRequest request) throws IOException {
-        boolean success = messageManager.postMessage(request.getUserId(), request.getContent());
-        String message = success ? "Message posted successfully" : "Failed to post message";
-        PostMessageResponse postMessageResponse = new PostMessageResponse(success, message);
+        Message msg = messageManager.postMessage(request.getUserId(), request.getUsername(), request.getContent());
+        if (msg.getID() >= 0) {
+            informClientsOfPostedMessage(msg);
+        }
+        PostMessageResponse postMessageResponse = new PostMessageResponse(msg.getID() >= 0, msg);
         output.writeObject(postMessageResponse);
+    }
+
+    private void informClientsOfPostedMessage(Message msg) throws IOException {
+        List<Integer> followers = messageManager.getFollowersList(msg.getUserID());
+        for (Client client : activeUsers) {
+            if (followers.contains(client.userId)) {
+                client.output.writeObject(new NewMessagePosted(msg));
+            }
+        }
     }
 
     private void handleFollowRequest(FollowRequest request) throws IOException {
@@ -111,6 +130,19 @@ public class ClientHandler extends Thread {
         }
 
         output.writeObject(new FollowResponse(success, message));
+    }
+
+    private void handlePostCommentRequest(PostCommentRequest req) throws IOException {
+        Comment postedComment = messageManager.postComment(req.getComment());
+        PostCommentResponse postCommentResponse = new PostCommentResponse(postedComment.getComment_id() >= 0,
+                postedComment);
+        output.writeObject(postCommentResponse);
+    }
+
+    private void handleRetrieveCommentsRequest(RetrieveCommentsRequest req) throws IOException {
+        List<Comment> comments = messageManager.retrieveComments(req.getPost_id());
+        RetrieveCommentsResponse retrieveCommentsResponse = new RetrieveCommentsResponse(req.getPost_id(), comments);
+        output.writeObject(retrieveCommentsResponse);
     }
 
     private void AddMessagesLists(int userId, String username, LoginResponse res) throws IOException {
@@ -216,8 +248,17 @@ class LoginResponse implements Serializable {
     private boolean success;
     private String message;
     private int userId; // User ID
+    private String username;
     private List<Message> userMessages;
     private List<Message> messagesOfInterest;
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String usename) {
+        this.username = usename;
+    }
 
     public List<Message> getUserMessages() {
         return userMessages;
@@ -227,10 +268,11 @@ class LoginResponse implements Serializable {
         return messagesOfInterest;
     }
 
-    public LoginResponse(boolean success, String message, int userId) {
+    public LoginResponse(boolean success, String message, int userId, String username) {
         this.success = success;
         this.message = message;
         this.userId = userId;
+        this.username = username;
     }
 
     // Getters
@@ -278,12 +320,22 @@ class RefreshFeedResponse implements Serializable {
 
 class PostMessageRequest implements Serializable {
     private int userId;
+    private String username;
     private String content;
 
     // Constructor
-    public PostMessageRequest(int userId, String content) {
+    public PostMessageRequest(int userId, String username, String content) {
         this.userId = userId;
         this.content = content;
+        this.username = username;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     // Getters
@@ -305,12 +357,119 @@ class PostMessageRequest implements Serializable {
     }
 }
 
+class PostCommentRequest implements Serializable {
+    private Comment comment;
+
+    public Comment getComment() {
+        return comment;
+    }
+
+    public PostCommentRequest(Comment comment) {
+        this.comment = comment;
+    }
+
+}
+
+class PostCommentResponse implements Serializable {
+    private boolean success;
+    private Comment comment;
+
+    public PostCommentResponse(boolean success, Comment comment) {
+        this.success = success;
+        this.comment = comment;
+    }
+
+    public Comment getComment() {
+        return comment;
+    }
+
+    public void setComment(Comment comment) {
+        this.comment = comment;
+    }
+
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public void setSuccess(boolean success) {
+        this.success = success;
+    }
+
+}
+
+class Comment implements Serializable {
+    private int comment_id;
+    private int post_id;
+    private int author_id;
+    private String author_username;
+    private String content;
+    private String date;
+
+    public Comment(int comment_id, int post_id, int user_id, String username, String content, String date) {
+        this.comment_id = comment_id;
+        this.post_id = post_id;
+        this.author_id = user_id;
+        this.author_username = username;
+        this.content = content;
+        this.date = date;
+    }
+
+    public int getComment_id() {
+        return comment_id;
+    }
+
+    public void setComment_id(int comment_id) {
+        this.comment_id = comment_id;
+    }
+
+    public int getPost_id() {
+        return post_id;
+    }
+
+    public void setPost_id(int post_id) {
+        this.post_id = post_id;
+    }
+
+    public int getAuthor_id() {
+        return author_id;
+    }
+
+    public void setAuthor_id(int user_id) {
+        this.author_id = user_id;
+    }
+
+    public String getAuthor_username() {
+        return author_username;
+    }
+
+    public void setAuthor_username(String username) {
+        this.author_username = username;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public String getDate() {
+        return date;
+    }
+
+    public void setDate(String date) {
+        this.date = date;
+    }
+
+}
+
 class PostMessageResponse implements Serializable {
     private boolean success;
-    private String message;
+    private Message message;
 
     // Constructor
-    public PostMessageResponse(boolean success, String message) {
+    public PostMessageResponse(boolean success, Message message) {
         this.success = success;
         this.message = message;
     }
@@ -320,7 +479,7 @@ class PostMessageResponse implements Serializable {
         return success;
     }
 
-    public String getMessage() {
+    public Message getMessage() {
         return message;
     }
 
@@ -329,7 +488,7 @@ class PostMessageResponse implements Serializable {
         this.success = success;
     }
 
-    public void setMessage(String message) {
+    public void setMessage(Message message) {
         this.message = message;
     }
 }
@@ -408,14 +567,23 @@ class FollowResponse implements Serializable {
 }
 
 class Message implements Serializable {
+
+    private final int ID;
+    private final int userID;
     private final String username;
     private final String content;
     private final String date;
 
-    public Message(String username, String content, String date) {
+    public Message(int userID, int ID, String username, String content, String date) {
+        this.ID = ID;
+        this.userID = userID;
         this.username = username;
         this.content = content;
         this.date = date;
+    }
+
+    public int getID() {
+        return ID;
     }
 
     public String getUsername() {
@@ -428,6 +596,10 @@ class Message implements Serializable {
 
     public String getDate() {
         return date;
+    }
+
+    public int getUserID() {
+        return userID;
     }
 
 }
@@ -459,4 +631,73 @@ class RefreshFeedRequest implements Serializable {
     public void setDate(String date) {
         this.date = date;
     }
+}
+
+class RetrieveCommentsRequest implements Serializable {
+    private int post_id;
+
+    public int getPost_id() {
+        return post_id;
+    }
+
+    public void setPost_id(int post_id) {
+        this.post_id = post_id;
+    }
+
+    // Constructor
+    public RetrieveCommentsRequest(int post_id) {
+        this.post_id = post_id;
+    }
+
+}
+
+class RetrieveCommentsResponse implements Serializable {
+    private int post_id;
+    private List<Comment> comments;
+
+    public RetrieveCommentsResponse(int post_id, List<Comment> comments) {
+        this.post_id = post_id;
+        this.comments = comments;
+    }
+
+    public int getPost_id() {
+        return post_id;
+    }
+
+    public void setPost_id(int post_id) {
+        this.post_id = post_id;
+    }
+
+    public List<Comment> getComments() {
+        return comments;
+    }
+}
+
+class NewMessagePosted implements Serializable {
+    private Message message;
+
+    public Message getMessage() {
+        return message;
+    }
+
+    public void setMessage(Message message) {
+        this.message = message;
+    }
+
+    // Constructor
+    public NewMessagePosted(Message message) {
+        this.message = message;
+    }
+
+}
+
+class Client {
+    int userId;
+    ObjectOutputStream output;
+
+    public Client(int userId, ObjectOutputStream output) {
+        this.userId = userId;
+        this.output = output;
+    }
+
 }
