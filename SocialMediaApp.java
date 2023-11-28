@@ -146,3 +146,60 @@
 // launch(args);
 // }
 // }
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+class ClickableEmojisExample extends JFrame {
+
+    public ClickableEmojisExample() {
+        setTitle("Clickable Emojis");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(400, 200);
+
+        JPanel emojiPanel = new JPanel(new FlowLayout());
+
+        // Create buttons for emojis
+        JButton loveButton = createEmojiButton("\u2764\uFE0F");
+        JButton thumbsUpButton = createEmojiButton("\uD83D\uDC4D");
+        JButton cryingButton = createEmojiButton("\uD83D\uDE22");
+        JButton angryButton = createEmojiButton("\uD83D\uDE20");
+        JButton laughingButton = createEmojiButton("\uD83D\uDE02");
+
+        // Add buttons to the panel
+        emojiPanel.add(loveButton);
+        emojiPanel.add(thumbsUpButton);
+        emojiPanel.add(cryingButton);
+        emojiPanel.add(angryButton);
+        emojiPanel.add(laughingButton);
+
+        // Set up the layout
+        setLayout(new BorderLayout());
+        add(emojiPanel, BorderLayout.CENTER);
+
+        setVisible(true);
+    }
+
+    private JButton createEmojiButton(String emoji) {
+        JButton button = new JButton(emoji);
+        button.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 20)); // Set the font to display emojis properly
+        button.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // Handle the click event for the emoji button
+                JOptionPane.showMessageDialog(ClickableEmojisExample.this, "You clicked on " + emoji);
+            }
+        });
+        return button;
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                new ClickableEmojisExample();
+            }
+        });
+    }
+}

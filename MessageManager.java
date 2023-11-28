@@ -53,15 +53,15 @@ public class MessageManager {
                     throw new SQLException("Creating message failed, no ID obtained.");
                 }
             }
-            return new Message(userId, postedMessageID, username, content, postedAt);
+            return new Message(userId, postedMessageID, username, content, postedAt, -1);
         } catch (SQLException e) {
             e.printStackTrace();
-            return new Message(userId, -1, username, content, "");
+            return new Message(userId, -1, username, content, "", -1);
         }
     }
 
     public List<Message> getMessagesByUser(int userId, String username) {
-        String sql = "SELECT id, content, posted_at FROM posts WHERE user_id = ?";
+        String sql = "SELECT p.id, p.content, p.posted_at, r.reaction FROM posts p LEFT JOIN reactions r ON r.post_id = p.id AND r.author_id = p.user_id WHERE p.user_id = ?;";
         List<Message> messages = new ArrayList<>();
         try (Connection connection = connect();
                 PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -71,7 +71,8 @@ public class MessageManager {
                 String content = resultSet.getString("content");
                 String date = resultSet.getString("posted_at");
                 int ID = resultSet.getInt("id");
-                messages.add(new Message(userId, ID, username, content, date));
+                int reaction = resultSet.getInt("reaction");
+                messages.add(new Message(userId, ID, username, content, date, reaction));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -100,7 +101,7 @@ public class MessageManager {
 
     public List<Message> getMessagesOfInterest(int userId) {
         List<Message> messages = new ArrayList<>();
-        String sql = "SELECT p.content, p.id, u.id as user_id, u.username, p.posted_at FROM posts p, users u, followers f WHERE f.follower_id = ? AND f.followed_id = p.user_id AND f.followed_id = u.id; ";
+        String sql = "SELECT p.content, p.id as post_id, u.id as user_id, u.username, p.posted_at, r.reaction FROM posts p JOIN users u ON p.user_id = u.id JOIN followers f ON f.follower_id = ? AND f.followed_id = p.user_id LEFT JOIN reactions r ON r.post_id = p.id AND r.author_id = f.follower_id;";
 
         try (Connection conn = DriverManager.getConnection(jdbcURL, jdbcUsername, jdbcPassword);
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -113,8 +114,9 @@ public class MessageManager {
                     String username = rs.getString("username");
                     String date = rs.getString("posted_at");
                     int user_id = rs.getInt("user_id");
-                    int id = rs.getInt("id");
-                    messages.add(new Message(user_id, id, username, content, date));
+                    int id = rs.getInt("post_id");
+                    int reaction = rs.getInt("reaction");
+                    messages.add(new Message(user_id, id, username, content, date, reaction));
                 }
             }
         } catch (SQLException e) {
@@ -153,7 +155,7 @@ public class MessageManager {
     public RefreshFeedResponse getRefreshFeed(int userId, String LastRefreshed) {
 
         List<Message> messages = new ArrayList<>();
-        String sql = "SELECT p.content, p.id, u.id as user_id, u.username, p.posted_at FROM (select * From posts where posted_at > ?) p, users u, followers f WHERE f.follower_id = ? AND f.followed_id = p.user_id AND f.followed_id = u.id; ";
+        String sql = "SELECT p.content, p.id, u.id as user_id, u.username, p.posted_at, r.reaction FROM ( SELECT * FROM posts WHERE posted_at > ?) p JOIN users u ON p.user_id = u.id JOIN followers f ON f.follower_id = ? AND f.followed_id = p.user_id LEFT JOIN reactions r ON r.post_id = p.id AND r.author_id = f.follower_id;";
         boolean success = false;
         try (Connection conn = DriverManager.getConnection(jdbcURL, jdbcUsername, jdbcPassword);
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -167,7 +169,8 @@ public class MessageManager {
                     String date = rs.getString("posted_at");
                     int user_id = rs.getInt("user_id");
                     int id = rs.getInt("id");
-                    messages.add(new Message(user_id, id, username, content, date));
+                    int reaction = rs.getInt("reaction");
+                    messages.add(new Message(user_id, id, username, content, date, reaction));
                 }
             }
             success = true;
@@ -233,5 +236,77 @@ public class MessageManager {
             e.printStackTrace();
             return comment;
         }
+    }
+
+    public PostReactionResponse postReaction(Reaction reaction) {
+        boolean oldReactionDeleted = false;
+        boolean newReactionAdded = false;
+        String deleteSQL = "DELETE FROM reactions WHERE post_id = ? AND author_id = ?";
+
+        try (Connection connection = connect();
+                PreparedStatement statement = connection.prepareStatement(deleteSQL)) {
+
+            statement.setInt(1, reaction.getPost_id());
+            statement.setInt(2, reaction.getAuthor_id());
+
+            int rowsAffected = statement.executeUpdate();
+
+            oldReactionDeleted = true;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        String sql = "INSERT INTO reactions (post_id, author_id, reaction) VALUES (?, ?, ?);";
+        try (Connection connection = connect();
+                PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            statement.setInt(1, reaction.getPost_id());
+            statement.setInt(2, reaction.getAuthor_id());
+            statement.setInt(3, reaction.getEmojiNumber());
+
+            int affectedRows = statement.executeUpdate();
+
+            if (affectedRows == 0) {
+                throw new SQLException("Creating message failed, no rows affected.");
+            }
+            int postedReactionID = -1;
+            newReactionAdded = true;
+            try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    postedReactionID = generatedKeys.getInt(1);
+
+                } else {
+                    throw new SQLException("Creating message failed, no ID obtained.");
+                }
+            }
+            reaction.setReaction_id(postedReactionID);
+
+            return new PostReactionResponse(oldReactionDeleted, newReactionAdded, reaction);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return new PostReactionResponse(oldReactionDeleted, newReactionAdded, reaction);
+        }
+    }
+
+    public RemoveReactionResponse RemoveReaction(int post_id, int user_id) {
+        boolean oldReactionDeleted = false;
+        String deleteSQL = "DELETE FROM reactions WHERE post_id = ? AND author_id = ?";
+
+        try (Connection connection = connect();
+                PreparedStatement statement = connection.prepareStatement(deleteSQL)) {
+
+            statement.setInt(1, post_id);
+            statement.setInt(2, user_id);
+
+            int rowsAffected = statement.executeUpdate();
+            if (rowsAffected > 0) {
+                oldReactionDeleted = true;
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return new RemoveReactionResponse(oldReactionDeleted, post_id, user_id);
     }
 }

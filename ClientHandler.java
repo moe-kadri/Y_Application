@@ -5,6 +5,9 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.swing.JButton;
+
 import java.io.Serializable;
 
 public class ClientHandler extends Thread {
@@ -49,7 +52,12 @@ public class ClientHandler extends Thread {
                     handlePostCommentRequest((PostCommentRequest) request);
                 } else if (request instanceof RetrieveCommentsRequest) {
                     handleRetrieveCommentsRequest((RetrieveCommentsRequest) request);
+                } else if (request instanceof PostReactionRequest) {
+                    handlePostReactionRequest((PostReactionRequest) request);
+                } else if (request instanceof RemoveReactionRequest) {
+                    handleRemoveReactionRequest((RemoveReactionRequest) request);
                 }
+
             }
         } catch (EOFException e) {
             System.err.println("Connection terminated: " + e.getMessage());
@@ -114,7 +122,7 @@ public class ClientHandler extends Thread {
     private void handleFollowRequest(FollowRequest request) throws IOException {
         boolean success;
         String message;
-
+        List<Message> messages = null;
         int followedUserId = userManager.getUserId(request.getFollowedUsername());
         if (followedUserId == -1) {
             success = false;
@@ -123,13 +131,15 @@ public class ClientHandler extends Thread {
             success = followManager.followUser(request.getFollowerId(), followedUserId);
             message = success ? "You are now following " + request.getFollowedUsername()
                     : "Failed to follow " + request.getFollowedUsername();
+            messages = messageManager.getMessagesByUser(followedUserId, request.getFollowedUsername());
+            // Add Retrieve the posts for this user
         } else {
             success = followManager.unfollowUser(request.getFollowerId(), followedUserId);
             message = success ? "You unfollowed " + request.getFollowedUsername()
                     : "Failed to unfollow " + request.getFollowedUsername();
         }
 
-        output.writeObject(new FollowResponse(success, message));
+        output.writeObject(new FollowResponse(success, message, messages, request.isFollow()));
     }
 
     private void handlePostCommentRequest(PostCommentRequest req) throws IOException {
@@ -137,6 +147,16 @@ public class ClientHandler extends Thread {
         PostCommentResponse postCommentResponse = new PostCommentResponse(postedComment.getComment_id() >= 0,
                 postedComment);
         output.writeObject(postCommentResponse);
+    }
+
+    private void handlePostReactionRequest(PostReactionRequest req) throws IOException {
+        PostReactionResponse res = messageManager.postReaction(req.getReaction());
+        output.writeObject(res);
+    }
+
+    private void handleRemoveReactionRequest(RemoveReactionRequest req) throws IOException {
+        RemoveReactionResponse res = messageManager.RemoveReaction(req.getPost_id(), req.getUser_id());
+        output.writeObject(res);
     }
 
     private void handleRetrieveCommentsRequest(RetrieveCommentsRequest req) throws IOException {
@@ -357,6 +377,124 @@ class PostMessageRequest implements Serializable {
     }
 }
 
+class RemoveReactionRequest implements Serializable {
+    private int post_id;
+    private int user_id;
+
+    public RemoveReactionRequest(int post_id, int user_id) {
+        this.post_id = post_id;
+        this.user_id = user_id;
+    }
+
+    public int getPost_id() {
+        return post_id;
+    }
+
+    public void setPost_id(int post_id) {
+        this.post_id = post_id;
+    }
+
+    public int getUser_id() {
+        return user_id;
+    }
+
+    public void setUser_id(int user_id) {
+        this.user_id = user_id;
+    }
+
+}
+
+class RemoveReactionResponse implements Serializable {
+    private boolean success;
+    private int post_id;
+    private int user_id;
+
+    public RemoveReactionResponse(boolean success, int post_id, int user_id) {
+        this.success = success;
+        this.post_id = post_id;
+        this.user_id = user_id;
+    }
+
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public void setSuccess(boolean success) {
+        this.success = success;
+    }
+
+    public int getPost_id() {
+        return post_id;
+    }
+
+    public void setPost_id(int post_id) {
+        this.post_id = post_id;
+    }
+
+    public int getUser_id() {
+        return user_id;
+    }
+
+    public void setUser_id(int user_id) {
+        this.user_id = user_id;
+    }
+
+}
+
+class PostReactionRequest implements Serializable {
+    private Reaction reaction;
+
+    public PostReactionRequest(Reaction reaction) {
+        this.reaction = reaction;
+    }
+
+    public Reaction getReaction() {
+        return reaction;
+    }
+
+    public void setReaction(Reaction reaction) {
+        this.reaction = reaction;
+    }
+
+}
+
+class PostReactionResponse implements Serializable {
+    private boolean oldReactionDeleted;
+    private boolean newReactionAdded;
+    private Reaction reaction;
+
+    public PostReactionResponse(boolean oldReactionDeleted, boolean newReactionAdded, Reaction reaction) {
+        this.oldReactionDeleted = oldReactionDeleted;
+        this.newReactionAdded = newReactionAdded;
+        this.reaction = reaction;
+    }
+
+    public boolean isOldReactionDeleted() {
+        return oldReactionDeleted;
+    }
+
+    public void setOldReactionDeleted(boolean oldReactionDeleted) {
+        this.oldReactionDeleted = oldReactionDeleted;
+    }
+
+    public boolean isNewReactionAdded() {
+        return newReactionAdded;
+    }
+
+    public void setNewReactionAdded(boolean newReactionAdded) {
+        this.newReactionAdded = newReactionAdded;
+    }
+
+    public Reaction getReaction() {
+        return reaction;
+    }
+
+    public void setReaction(Reaction reaction) {
+        this.reaction = reaction;
+    }
+
+}
+
 class PostCommentRequest implements Serializable {
     private Comment comment;
 
@@ -464,6 +602,53 @@ class Comment implements Serializable {
 
 }
 
+class Reaction implements Serializable {
+    private int reaction_id;
+    private int post_id;
+    private int author_id;
+    private int emojiNumber;
+
+    public int getReaction_id() {
+        return reaction_id;
+    }
+
+    public void setReaction_id(int reaction_id) {
+        this.reaction_id = reaction_id;
+    }
+
+    public int getPost_id() {
+        return post_id;
+    }
+
+    public void setPost_id(int post_id) {
+        this.post_id = post_id;
+    }
+
+    public int getAuthor_id() {
+        return author_id;
+    }
+
+    public void setAuthor_id(int author_id) {
+        this.author_id = author_id;
+    }
+
+    public int getEmojiNumber() {
+        return emojiNumber;
+    }
+
+    public void setEmojiNumber(int emojiNumber) {
+        this.emojiNumber = emojiNumber;
+    }
+
+    public Reaction(int reaction_id, int post_id, int author_id, int emojiNumber) {
+        this.reaction_id = reaction_id;
+        this.post_id = post_id;
+        this.author_id = author_id;
+        this.emojiNumber = emojiNumber;
+    }
+
+}
+
 class PostMessageResponse implements Serializable {
     private boolean success;
     private Message message;
@@ -539,12 +724,31 @@ class FollowRequest implements Serializable {
 
 class FollowResponse implements Serializable {
     private boolean success;
+    private boolean FollowRequest;
     private String message;
+    private List<Message> messages;
 
-    // Constructor
-    public FollowResponse(boolean success, String message) {
+    public FollowResponse(boolean success, String message, List<Message> messages, boolean FollowRequest) {
         this.success = success;
         this.message = message;
+        this.messages = messages;
+        this.FollowRequest = FollowRequest;
+    }
+
+    public boolean isFollowRequest() {
+        return FollowRequest;
+    }
+
+    public void setFollowRequest(boolean followRequest) {
+        FollowRequest = followRequest;
+    }
+
+    public List<Message> getMessages() {
+        return messages;
+    }
+
+    public void setMessages(List<Message> messages) {
+        this.messages = messages;
     }
 
     // Getters
@@ -573,13 +777,23 @@ class Message implements Serializable {
     private final String username;
     private final String content;
     private final String date;
+    private int reaction;
 
-    public Message(int userID, int ID, String username, String content, String date) {
+    public Message(int userID, int ID, String username, String content, String date, int reaction) {
         this.ID = ID;
         this.userID = userID;
         this.username = username;
         this.content = content;
         this.date = date;
+        this.reaction = reaction;
+    }
+
+    public int getReaction() {
+        return reaction;
+    }
+
+    public void setReaction(int reaction) {
+        this.reaction = reaction;
     }
 
     public int getID() {
