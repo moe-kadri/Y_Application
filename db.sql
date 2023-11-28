@@ -18,6 +18,24 @@ CREATE SCHEMA IF NOT EXISTS `y` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_09
 USE `y` ;
 
 -- -----------------------------------------------------
+-- Table `y`.`comments`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `y`.`comments` (
+  `comment_id` INT NOT NULL AUTO_INCREMENT,
+  `post_id` INT NULL DEFAULT NULL,
+  `author_id` INT NULL DEFAULT NULL,
+  `content` TEXT NULL DEFAULT NULL,
+  `posted_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`comment_id`),
+  INDEX `post_id` (`post_id` ASC) VISIBLE,
+  INDEX `author_id` (`author_id` ASC) VISIBLE)
+ENGINE = InnoDB
+AUTO_INCREMENT = 24
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+
+-- -----------------------------------------------------
 -- Table `y`.`users`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `y`.`users` (
@@ -27,9 +45,10 @@ CREATE TABLE IF NOT EXISTS `y`.`users` (
   `name` VARCHAR(100) NULL DEFAULT NULL,
   `email` VARCHAR(100) NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE INDEX `unique_username` (`username` ASC) VISIBLE)
+  UNIQUE INDEX `unique_username` (`username` ASC) VISIBLE,
+  UNIQUE INDEX `email_UNIQUE` (`email` ASC) VISIBLE)
 ENGINE = InnoDB
-AUTO_INCREMENT = 2
+AUTO_INCREMENT = 4
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -54,26 +73,48 @@ COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- -----------------------------------------------------
--- Table `y`.`messages`
+-- Table `y`.`posts`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `y`.`messages` (
+CREATE TABLE IF NOT EXISTS `y`.`posts` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `user_id` INT NULL DEFAULT NULL,
   `content` TEXT NULL DEFAULT NULL,
   `posted_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   INDEX `user_id` (`user_id` ASC) VISIBLE,
-  CONSTRAINT `messages_ibfk_1`
+  CONSTRAINT `posts_ibfk_1`
     FOREIGN KEY (`user_id`)
     REFERENCES `y`.`users` (`id`))
 ENGINE = InnoDB
-AUTO_INCREMENT = 4
+AUTO_INCREMENT = 39
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
-SELECT m.content, u.username 
-FROM messages m 
-JOIN users u ON m.user_id = u.id;
+
+-- -----------------------------------------------------
+-- Table `y`.`reactions`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `y`.`reactions` (
+  `reaction_id` INT NOT NULL AUTO_INCREMENT,
+  `post_id` INT NULL DEFAULT NULL,
+  `author_id` INT NULL DEFAULT NULL,
+  `reaction` INT NULL DEFAULT NULL,
+  `posted_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`reaction_id`),
+  UNIQUE INDEX `unique_reaction` (`post_id` ASC, `author_id` ASC) VISIBLE,
+  INDEX `author_id` (`author_id` ASC) VISIBLE,
+  CONSTRAINT `reactions_ibfk_1`
+    FOREIGN KEY (`post_id`)
+    REFERENCES `y`.`posts` (`id`),
+  CONSTRAINT `reactions_ibfk_2`
+    FOREIGN KEY (`author_id`)
+    REFERENCES `y`.`users` (`id`)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE)
+ENGINE = InnoDB
+AUTO_INCREMENT = 135
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
 
 
 SET SQL_MODE=@OLD_SQL_MODE;
