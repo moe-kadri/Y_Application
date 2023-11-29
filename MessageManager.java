@@ -41,7 +41,6 @@ public class MessageManager {
             try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
                     postedMessageID = generatedKeys.getInt(1);
-                    // Retrieve posted_at separately
                     String sqlGetPostedAt = "SELECT posted_at FROM posts WHERE id = ?";
                     try (PreparedStatement getPostedAtStatement = connection.prepareStatement(sqlGetPostedAt)) {
                         getPostedAtStatement.setInt(1, postedMessageID);
@@ -109,8 +108,7 @@ public class MessageManager {
         try (Connection conn = DriverManager.getConnection(jdbcURL, jdbcUsername, jdbcPassword);
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setInt(1, userId); // Set the user_id if filtering by user
-
+            stmt.setInt(1, userId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     String content = rs.getString("content");
@@ -120,25 +118,24 @@ public class MessageManager {
                     int id = rs.getInt("post_id");
                     int reaction = rs.getInt("reaction");
                     Map<Integer, Integer> reactionCountMap = getPostReactionsCount(id);
-                    // System.out.println(reactionCountMap.size());
                     messages.add(new Message(id, user_id, username, content, date, reaction, reactionCountMap));
                 }
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            // Handle exceptions
         }
         return messages;
     }
 
     public List<Message> getExplorePage(int userId) {
         List<Message> messages = new ArrayList<>();
-        String sql = "SELECT p.content, p.id as post_id, u.id as user_id, u.username, p.posted_at, r.reaction FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN reactions r ON r.post_id = p.id AND r.author_id = ?;";
+        String sql = "SELECT p.content, p.id as post_id, u.id as user_id, u.username, p.posted_at, r.reaction FROM (select * from posts where user_id <> ?) p JOIN users u ON p.user_id = u.id LEFT JOIN reactions r ON r.post_id = p.id AND r.author_id = ? ;";
 
         try (Connection conn = DriverManager.getConnection(jdbcURL, jdbcUsername, jdbcPassword);
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setInt(1, userId); // Set the user_id if filtering by user
+            stmt.setInt(1, userId);
+            stmt.setInt(2, userId);
 
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {

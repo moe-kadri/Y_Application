@@ -121,40 +121,96 @@ public class YClient {
     }
 
     private JPanel createRegisterPanel() {
-        JPanel registerPanel = new JPanel(new GridLayout(5, 2));
-        nameField = new JTextField();
-        emailField = new JTextField();
-        usernameField = new JTextField();
-        passwordField = new JPasswordField();
-        JButton registerButton = new JButton("Register");
+        JPanel registerPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.insets = new Insets(5, 5, 5, 5);
 
-        registerPanel.add(new JLabel("Name:"));
-        registerPanel.add(nameField);
-        registerPanel.add(new JLabel("Email:"));
-        registerPanel.add(emailField);
-        registerPanel.add(new JLabel("Username:"));
-        registerPanel.add(usernameField);
-        registerPanel.add(new JLabel("Password:"));
-        registerPanel.add(passwordField);
-        registerPanel.add(registerButton);
+        JLabel nameLabel = new JLabel("Name:");
+        registerPanel.add(nameLabel, gbc);
+
+        gbc.gridy++;
+        JLabel emailLabel = new JLabel("Email:");
+        registerPanel.add(emailLabel, gbc);
+
+        gbc.gridy++;
+        JLabel usernameLabel = new JLabel("Username:");
+        registerPanel.add(usernameLabel, gbc);
+
+        gbc.gridy++;
+        JLabel passwordLabel = new JLabel("Password:");
+        registerPanel.add(passwordLabel, gbc);
+
+        gbc.gridy = 0;
+        gbc.gridx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        nameField = new JTextField(15);
+        registerPanel.add(nameField, gbc);
+
+        gbc.gridy++;
+        emailField = new JTextField(15);
+        registerPanel.add(emailField, gbc);
+
+        gbc.gridy++;
+        usernameField = new JTextField(15);
+        registerPanel.add(usernameField, gbc);
+
+        gbc.gridy++;
+        passwordField = new JPasswordField(15);
+        registerPanel.add(passwordField, gbc);
+
+        gbc.gridy++;
+        gbc.gridx = 0;
+        gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.NONE;
+        JButton registerButton = new JButton("Register");
+        registerPanel.add(registerButton, gbc);
 
         registerButton.addActionListener(e -> handleRegistration());
+
+        // Optional: Add a titled border for better visual separation
+        registerPanel.setBorder(BorderFactory.createTitledBorder("Register"));
+
         return registerPanel;
     }
 
     private JPanel createLoginPanel() {
-        JPanel loginPanel = new JPanel(new GridLayout(3, 2));
-        loginUsernameField = new JTextField();
-        loginPasswordField = new JPasswordField();
-        JButton loginButton = new JButton("Login");
+        JPanel loginPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.insets = new Insets(5, 5, 5, 5);
 
-        loginPanel.add(new JLabel("Username:"));
-        loginPanel.add(loginUsernameField);
-        loginPanel.add(new JLabel("Password:"));
-        loginPanel.add(loginPasswordField);
-        loginPanel.add(loginButton);
+        JLabel usernameLabel = new JLabel("Username:");
+        loginPanel.add(usernameLabel, gbc);
+
+        gbc.gridy++;
+        JLabel passwordLabel = new JLabel("Password:");
+        loginPanel.add(passwordLabel, gbc);
+
+        gbc.gridy = 0;
+        gbc.gridx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        loginUsernameField = new JTextField(15);
+        loginPanel.add(loginUsernameField, gbc);
+
+        gbc.gridy++;
+        loginPasswordField = new JPasswordField(15);
+        loginPanel.add(loginPasswordField, gbc);
+
+        gbc.gridy++;
+        gbc.gridx = 0;
+        gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.NONE;
+        JButton loginButton = new JButton("Login");
+        loginPanel.add(loginButton, gbc);
 
         loginButton.addActionListener(e -> handleLogin());
+
+        // Optional: Add a titled border for better visual separation
+        loginPanel.setBorder(BorderFactory.createTitledBorder("Login"));
+
         return loginPanel;
     }
 
@@ -759,7 +815,7 @@ public class YClient {
 
     private void showPostLoginUI(List<Message> userMessages, List<Message> messagesOfInterest) {
         frame.getContentPane().removeAll();
-        frame = new JFrame("Y Platform Client");
+        // frame = new JFrame("Y Platform Client");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(700, 800);
         frame.setLayout(new BorderLayout());
