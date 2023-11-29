@@ -37,7 +37,8 @@ public class YClient {
     private List<EmojiButtons> emojiButtons;
     private List<RemoveReactionEmojiButton> RemoveReactionEmojiButtons;
     JPanel PostsPanel;
-    JPanel chatPanel;
+    JPanel explorePagePanel;
+    JPanel explorePanel;
 
     public YClient() {
         connectToServer("localhost", 56300); // Replace with your server's address and port
@@ -73,6 +74,8 @@ public class YClient {
                     handlePostReactionResponse((PostReactionResponse) response);
                 } else if (response instanceof RemoveReactionResponse) {
                     handleRemoveReactionResponse((RemoveReactionResponse) response);
+                } else if (response instanceof getExplorePageResponse) {
+                    handleGetExplorePageResponse((getExplorePageResponse) response);
                 }
 
             }
@@ -298,6 +301,10 @@ public class YClient {
         sendRequest(request);
     }
 
+    private void handGetExplorePageRequest() {
+        sendRequest(new getExplorePageRequest(userId));
+    }
+
     private void handleRefreshFeed() {
         RefreshFeedRequest request = new RefreshFeedRequest(userId, LastRefreshed);
         sendRequest(request);
@@ -347,6 +354,8 @@ public class YClient {
             List<Message> userMessages = response.getUserMessages();
             List<Message> messagesOfInterest = response.getMessagesOfInterest();
             showPostLoginUI(userMessages, messagesOfInterest);
+            handGetExplorePageRequest();
+
             if (messagesOfInterest.size() > 0)
                 LastRefreshed = new String(messagesOfInterest.get(messagesOfInterest.size() - 1).getDate());
             else {
@@ -397,6 +406,26 @@ public class YClient {
         PostsPanel.add(containerPanel, BorderLayout.CENTER);
         PostsPanel.revalidate();
         PostsPanel.repaint();
+    }
+
+    private void handleGetExplorePageResponse(getExplorePageResponse res) {
+        updateExploreMessages(res.getMessages());
+    }
+
+    private void updateExploreMessages(List<Message> messages) {
+
+        for (Message msg : messages) {
+            JPanel messageItemPanel = createMessagePanel(
+                    new Post(msg.getID(), msg.getUserID(), msg.getUsername(), msg.getContent(), msg.getDate(),
+                            msg.getReaction(), msg.getReactionCountMap()));
+            explorePanel.add(messageItemPanel);
+        }
+
+        if (messages.isEmpty()) {
+            JPanel noMessagePanel = createMessagePanel(new Post(0, 0, "No messages to display.", "", "", -1, null));
+            explorePanel.add(noMessagePanel);
+        }
+
     }
 
     // private JPanel createMessagePanel(String username, String content, String
@@ -738,6 +767,8 @@ public class YClient {
         JTabbedPane tabbedPane = new JTabbedPane();
         PostsPanel = new JPanel();
         PostsPanel.setLayout(new BorderLayout());
+        explorePagePanel = new JPanel();
+        explorePagePanel.setLayout(new BorderLayout());
 
         JPanel postLoginPanel = new JPanel(new BorderLayout());
         postLoginPanel.add(createPostPanel(), BorderLayout.NORTH);
@@ -750,8 +781,16 @@ public class YClient {
         PostsPanel.revalidate();
         PostsPanel.repaint();
         tabbedPane.addTab("Posts", PostsPanel);
-        chatPanel = createChatPanel();
-        tabbedPane.addTab("Chat", chatPanel);
+        explorePanel = new JPanel();
+        explorePanel.setLayout(new BoxLayout(explorePanel, BoxLayout.Y_AXIS));
+        JScrollPane scrollPane = new JScrollPane(explorePanel);
+        JPanel containerPanel = new JPanel(new BorderLayout());
+        containerPanel.add(scrollPane, BorderLayout.CENTER);
+        explorePagePanel.add(containerPanel, BorderLayout.CENTER);
+
+        explorePagePanel.revalidate();
+        explorePagePanel.repaint();
+        tabbedPane.addTab("Explore", explorePagePanel);
         frame.getContentPane().add(tabbedPane, BorderLayout.CENTER);
         frame.setVisible(true);
     }
@@ -760,14 +799,12 @@ public class YClient {
         String usernameToFollow = followUsernameField.getText();
         FollowRequest request = new FollowRequest(userId, usernameToFollow, true);
         sendRequest(request);
-        // Handle the response
     }
 
     private void handleUnfollow() {
         String usernameToUnfollow = followUsernameField.getText();
         FollowRequest request = new FollowRequest(userId, usernameToUnfollow, false);
         sendRequest(request);
-        // Handle the response
     }
 
     private void handleFollowResponse(FollowResponse response) {
@@ -863,146 +900,143 @@ public class YClient {
         }
     }
 
-    private static JPanel createChatPanel() {
-        JPanel chatPanel = new JPanel(new BorderLayout());
+    // private static JPanel createChatPanel() {
+    // JPanel chatPanel = new JPanel(new BorderLayout());
 
-        List<Chat> chats = createDummyChats();
-        DefaultListModel<Chat> chatListModel = new DefaultListModel<>();
+    // List<Chat> chats = createDummyChats();
+    // DefaultListModel<Chat> chatListModel = new DefaultListModel<>();
 
-        for (Chat chat : chats) {
-            chatListModel.addElement(chat);
-        }
+    // for (Chat chat : chats) {
+    // chatListModel.addElement(chat);
+    // }
 
-        JList<Chat> chatList = new JList<>(chatListModel);
-        chatList.setCellRenderer(new ChatListCellRenderer());
+    // JList<Chat> chatList = new JList<>(chatListModel);
+    // chatList.setCellRenderer(new ChatListCellRenderer());
 
-        JScrollPane scrollPane = new JScrollPane(chatList);
-        chatPanel.add(scrollPane, BorderLayout.CENTER);
+    // JScrollPane scrollPane = new JScrollPane(chatList);
+    // chatPanel.add(scrollPane, BorderLayout.CENTER);
 
-        chatList.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                JList<Chat> list = (JList<Chat>) evt.getSource();
-                if (evt.getClickCount() == 2) {
-                    int index = list.locationToIndex(evt.getPoint());
-                    if (index >= 0) {
-                        Chat selectedChat = list.getModel().getElementAt(index);
-                        openChatWindow(selectedChat);
-                    }
-                }
-            }
-        });
+    // chatList.addMouseListener(new java.awt.event.MouseAdapter() {
+    // public void mouseClicked(java.awt.event.MouseEvent evt) {
+    // JList<Chat> list = (JList<Chat>) evt.getSource();
+    // if (evt.getClickCount() == 2) {
+    // int index = list.locationToIndex(evt.getPoint());
+    // if (index >= 0) {
+    // Chat selectedChat = list.getModel().getElementAt(index);
+    // openChatWindow(selectedChat);
+    // }
+    // }
+    // }
+    // });
 
-        return chatPanel;
-    }
+    // return chatPanel;
+    // }
 
-    private static void openChatWindow(Chat chat) {
-        JFrame chatFrame = new JFrame(chat.getName() + " Chat");
-        chatFrame.setSize(400, 500);
-        chatFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    // private static void openChatWindow(Chat chat) {
+    // JFrame chatFrame = new JFrame(chat.getName() + " Chat");
+    // chatFrame.setSize(400, 500);
+    // chatFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        JPanel chatContainer = new JPanel();
-        chatContainer.setLayout(new GridBagLayout());
+    // JPanel chatContainer = new JPanel();
+    // chatContainer.setLayout(new GridBagLayout());
 
-        JTextPane chatArea = new JTextPane();
-        chatArea.setEditable(false);
+    // JTextPane chatArea = new JTextPane();
+    // chatArea.setEditable(false);
 
-        JScrollPane scrollPane = new JScrollPane(chatArea);
-        GridBagConstraints chatConstraints = new GridBagConstraints();
-        chatConstraints.gridx = 0;
-        chatConstraints.gridy = 0;
-        chatConstraints.weightx = 1.0;
-        chatConstraints.weighty = 1.0;
-        chatConstraints.fill = GridBagConstraints.BOTH;
-        chatContainer.add(scrollPane, chatConstraints);
+    // JScrollPane scrollPane = new JScrollPane(chatArea);
+    // GridBagConstraints chatConstraints = new GridBagConstraints();
+    // chatConstraints.gridx = 0;
+    // chatConstraints.gridy = 0;
+    // chatConstraints.weightx = 1.0;
+    // chatConstraints.weighty = 1.0;
+    // chatConstraints.fill = GridBagConstraints.BOTH;
+    // chatContainer.add(scrollPane, chatConstraints);
 
-        JTextField messageField = new JTextField();
-        JButton sendButton = new JButton("Send");
+    // JTextField messageField = new JTextField();
+    // JButton sendButton = new JButton("Send");
 
-        sendButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String message = messageField.getText();
-                if (!message.isEmpty()) {
-                    addChatToPane(chatArea, chat.getUserName(), message);
-                    messageField.setText("");
-                }
-            }
-        });
+    // sendButton.addActionListener(new ActionListener() {
+    // @Override
+    // public void actionPerformed(ActionEvent e) {
+    // String message = messageField.getText();
+    // if (!message.isEmpty()) {
+    // addChatToPane(chatArea, chat.getUserName(), message);
+    // messageField.setText("");
+    // }
+    // }
+    // });
 
-        JPanel inputPanel = new JPanel(new BorderLayout());
-        inputPanel.add(messageField, BorderLayout.CENTER);
-        inputPanel.add(sendButton, BorderLayout.EAST);
+    // JPanel inputPanel = new JPanel(new BorderLayout());
+    // inputPanel.add(messageField, BorderLayout.CENTER);
+    // inputPanel.add(sendButton, BorderLayout.EAST);
 
-        GridBagConstraints inputConstraints = new GridBagConstraints();
-        inputConstraints.gridx = 0;
-        inputConstraints.gridy = 1;
-        inputConstraints.weightx = 1.0;
-        inputConstraints.fill = GridBagConstraints.HORIZONTAL;
-        chatContainer.add(inputPanel, inputConstraints);
+    // GridBagConstraints inputConstraints = new GridBagConstraints();
+    // inputConstraints.gridx = 0;
+    // inputConstraints.gridy = 1;
+    // inputConstraints.weightx = 1.0;
+    // inputConstraints.fill = GridBagConstraints.HORIZONTAL;
+    // chatContainer.add(inputPanel, inputConstraints);
 
-        chatFrame.add(chatContainer, BorderLayout.CENTER);
-        chatFrame.setVisible(true);
-    }
+    // chatFrame.add(chatContainer, BorderLayout.CENTER);
+    // chatFrame.setVisible(true);
+    // }
 
-    private static void addChatToPane(JTextPane chatArea, String username, String message) {
-        StyledDocument doc = chatArea.getStyledDocument();
-        SimpleAttributeSet keyWord = new SimpleAttributeSet();
-        StyleConstants.setForeground(keyWord, Color.BLACK);
+    // private static void addChatToPane(JTextPane chatArea, String username, String
+    // message) {
+    // StyledDocument doc = chatArea.getStyledDocument();
+    // SimpleAttributeSet keyWord = new SimpleAttributeSet();
+    // StyleConstants.setForeground(keyWord, Color.BLACK);
 
-        try {
-            // Create a border for the chat
-            Border border = BorderFactory.createLineBorder(Color.GRAY, 1);
+    // try {
+    // // Create a border for the chat
+    // Border border = BorderFactory.createLineBorder(Color.GRAY, 1);
 
-            // Create a panel to contain the chat and set the border
-            JPanel chatPanel = new JPanel(new BorderLayout());
-            chatPanel.setBorder(border);
+    // // Create a panel to contain the chat and set the border
+    // JPanel chatPanel = new JPanel(new BorderLayout());
+    // chatPanel.setBorder(border);
 
-            // Add username to the panel
-            JLabel usernameLabel = new JLabel(username);
-            chatPanel.add(usernameLabel, BorderLayout.NORTH);
+    // // Add username to the panel
+    // JLabel usernameLabel = new JLabel(username);
+    // chatPanel.add(usernameLabel, BorderLayout.NORTH);
 
-            // Add message to the panel
-            JTextPane chatMessage = new JTextPane();
-            chatMessage.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-            chatMessage.setEditable(false);
-            chatMessage.setText(message);
-            chatPanel.add(chatMessage, BorderLayout.CENTER);
+    // // Add message to the panel
+    // JTextPane chatMessage = new JTextPane();
+    // chatMessage.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+    // chatMessage.setEditable(false);
+    // chatMessage.setText(message);
+    // chatPanel.add(chatMessage, BorderLayout.CENTER);
 
-            // Add date in small font to the panel
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-            String dateStr = dateFormat.format(new Date());
-            JLabel dateLabel = new JLabel(dateStr);
-            dateLabel.setFont(new Font(dateLabel.getFont().getName(), Font.PLAIN, 10));
-            chatPanel.add(dateLabel, BorderLayout.SOUTH);
+    // // Add date in small font to the panel
+    // SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    // String dateStr = dateFormat.format(new Date());
+    // JLabel dateLabel = new JLabel(dateStr);
+    // dateLabel.setFont(new Font(dateLabel.getFont().getName(), Font.PLAIN, 10));
+    // chatPanel.add(dateLabel, BorderLayout.SOUTH);
 
-            // Insert the panel into the JTextPane
-            chatArea.insertComponent(chatPanel);
+    // // Insert the panel into the JTextPane
+    // chatArea.insertComponent(chatPanel);
 
-            // Insert a new line after each chat
-            doc.insertString(doc.getLength(), "\n", null);
+    // // Insert a new line after each chat
+    // doc.insertString(doc.getLength(), "\n", null);
 
-            // Scroll to the bottom of the chatArea
-            chatArea.setCaretPosition(doc.getLength());
+    // // Scroll to the bottom of the chatArea
+    // chatArea.setCaretPosition(doc.getLength());
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    // } catch (Exception e) {
+    // e.printStackTrace();
+    // }
+    // }
 
-    private static String getCurrentDateFormatted() {
-        // You can use your preferred date formatting here
-        return java.time.LocalDateTime.now().toString();
-    }
-
-    private static List<Chat> createDummyChats() {
-        List<Chat> chats = new ArrayList<>();
-        chats.add(new Chat("John Doe", "john.doe@example.com"));
-        chats.add(new Chat("Alice Smith", "alice.smith@example.com"));
-        chats.add(new Chat("Bob Johnson", "bob.johnson@example.com"));
-        return chats;
-    }
+    // private static List<Chat> createDummyChats() {
+    // List<Chat> chats = new ArrayList<>();
+    // chats.add(new Chat("John Doe", "john.doe@example.com"));
+    // chats.add(new Chat("Alice Smith", "alice.smith@example.com"));
+    // chats.add(new Chat("Bob Johnson", "bob.johnson@example.com"));
+    // return chats;
+    // }
 
     static class Chat {
+
         private String name;
         private String userName;
 

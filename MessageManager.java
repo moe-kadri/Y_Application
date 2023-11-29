@@ -131,6 +131,34 @@ public class MessageManager {
         return messages;
     }
 
+    public List<Message> getExplorePage(int userId) {
+        List<Message> messages = new ArrayList<>();
+        String sql = "SELECT p.content, p.id as post_id, u.id as user_id, u.username, p.posted_at, r.reaction FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN reactions r ON r.post_id = p.id AND r.author_id = ?;";
+
+        try (Connection conn = DriverManager.getConnection(jdbcURL, jdbcUsername, jdbcPassword);
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, userId); // Set the user_id if filtering by user
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    String content = rs.getString("content");
+                    String username = rs.getString("username");
+                    String date = rs.getString("posted_at");
+                    int user_id = rs.getInt("user_id");
+                    int id = rs.getInt("post_id");
+                    int reaction = rs.getInt("reaction");
+                    Map<Integer, Integer> reactionCountMap = getPostReactionsCount(id);
+                    messages.add(new Message(id, user_id, username, content, date, reaction, reactionCountMap));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            // Handle exceptions
+        }
+        return messages;
+    }
+
     public List<Comment> retrieveComments(int post_id) {
         List<Comment> comments = new ArrayList<>();
         String sql = "SELECT c.comment_id, c.author_id, u.username, c.content, c.posted_at FROM comments c, users u where u.id = c.author_id and c.post_id = ? ;";

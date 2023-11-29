@@ -57,6 +57,8 @@ public class ClientHandler extends Thread {
                     handlePostReactionRequest((PostReactionRequest) request);
                 } else if (request instanceof RemoveReactionRequest) {
                     handleRemoveReactionRequest((RemoveReactionRequest) request);
+                } else if (request instanceof getExplorePageRequest) {
+                    handleGetExplorePageRequest((getExplorePageRequest) request);
                 }
 
             }
@@ -95,6 +97,11 @@ public class ClientHandler extends Thread {
         output.writeObject(response);
         client = new Client(userId, output);
         activeUsers.add(client);
+    }
+
+    private void handleGetExplorePageRequest(getExplorePageRequest req) throws IOException {
+        List<Message> message = messageManager.getExplorePage(req.getUserId());
+        output.writeObject(new getExplorePageResponse(req.getUserId(), message));
     }
 
     private void handleRefreshFeed(RefreshFeedRequest request) throws IOException {
@@ -856,6 +863,50 @@ class RefreshFeedRequest implements Serializable {
     public void setDate(String date) {
         this.date = date;
     }
+}
+
+class getExplorePageRequest implements Serializable {
+    private int userId;
+
+    public int getUserId() {
+        return userId;
+    }
+
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
+
+    public getExplorePageRequest(int userId) {
+        this.userId = userId;
+    }
+
+}
+
+class getExplorePageResponse implements Serializable {
+    private int userId;
+    private List<Message> messages;
+
+    public getExplorePageResponse(int userId, List<Message> messages) {
+        this.userId = userId;
+        this.messages = messages;
+    }
+
+    public int getUserId() {
+        return userId;
+    }
+
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
+
+    public List<Message> getMessages() {
+        return messages;
+    }
+
+    public void setMessages(List<Message> messages) {
+        this.messages = messages;
+    }
+
 }
 
 class RetrieveCommentsRequest implements Serializable {
