@@ -5,6 +5,7 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.JButton;
 
@@ -771,33 +772,31 @@ class FollowResponse implements Serializable {
 }
 
 class Message implements Serializable {
-
     private final int ID;
     private final int userID;
     private final String username;
     private final String content;
     private final String date;
     private int reaction;
+    private Map<Integer, Integer> reactionCountMap;
 
-    public Message(int userID, int ID, String username, String content, String date, int reaction) {
-        this.ID = ID;
+    public Message(int iD, int userID, String username, String content, String date, int reaction,
+            Map<Integer, Integer> reactionCountMap) {
+        ID = iD;
         this.userID = userID;
         this.username = username;
         this.content = content;
         this.date = date;
         this.reaction = reaction;
-    }
-
-    public int getReaction() {
-        return reaction;
-    }
-
-    public void setReaction(int reaction) {
-        this.reaction = reaction;
+        this.reactionCountMap = reactionCountMap;
     }
 
     public int getID() {
         return ID;
+    }
+
+    public int getUserID() {
+        return userID;
     }
 
     public String getUsername() {
@@ -812,8 +811,20 @@ class Message implements Serializable {
         return date;
     }
 
-    public int getUserID() {
-        return userID;
+    public int getReaction() {
+        return reaction;
+    }
+
+    public void setReaction(int reaction) {
+        this.reaction = reaction;
+    }
+
+    public Map<Integer, Integer> getReactionCountMap() {
+        return reactionCountMap;
+    }
+
+    public void setReactionCountMap(Map<Integer, Integer> reactionCountMap) {
+        this.reactionCountMap = reactionCountMap;
     }
 
 }

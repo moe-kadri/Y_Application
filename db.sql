@@ -121,7 +121,7 @@ SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
 
-// commands:
-javac -cp "Connector J 8.0\mysql-connector-j-8.0.33.jar" *.java 
-java -cp ".;Connector J 8.0\mysql-connector-j-8.0.33.jar" YServer 56300
-java -cp ".;Connector J 8.0\mysql-connector-j-8.0.33.jar" YClient
+-- commands:
+-- javac -cp "Connector J 8.0\mysql-connector-j-8.0.33.jar" *.java 
+-- java -cp ".;Connector J 8.0\mysql-connector-j-8.0.33.jar" YServer 56300
+-- java -cp ".;Connector J 8.0\mysql-connector-j-8.0.33.jar" YClient

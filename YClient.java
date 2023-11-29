@@ -1,12 +1,20 @@
 import javax.swing.*;
+import javax.swing.border.Border;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.SimpleAttributeSet;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.StyledDocument;
+
 import java.awt.*;
 import java.io.*;
 import java.net.Socket;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.List;
 
 public class YClient {
     private JFrame frame;
@@ -28,6 +36,8 @@ public class YClient {
     private List<CommentPanel> postCommentPanels;
     private List<EmojiButtons> emojiButtons;
     private List<RemoveReactionEmojiButton> RemoveReactionEmojiButtons;
+    JPanel PostsPanel;
+    JPanel chatPanel;
 
     public YClient() {
         connectToServer("localhost", 56300); // Replace with your server's address and port
@@ -363,19 +373,19 @@ public class YClient {
         for (Message msg : userMessages) {
             JPanel userMessagePanel = createMessagePanel(
                     new Post(msg.getID(), msg.getUserID(), msg.getUsername(), msg.getContent(), msg.getDate(),
-                            msg.getReaction()));
+                            msg.getReaction(), msg.getReactionCountMap()));
             messagePanel.add(userMessagePanel);
         }
 
         for (Message msg : messagesOfInterest) {
             JPanel messageItemPanel = createMessagePanel(
                     new Post(msg.getID(), msg.getUserID(), msg.getUsername(), msg.getContent(), msg.getDate(),
-                            msg.getReaction()));
+                            msg.getReaction(), msg.getReactionCountMap()));
             messagePanel.add(messageItemPanel);
         }
 
         if (userMessages.isEmpty() && messagesOfInterest.isEmpty()) {
-            JPanel noMessagePanel = createMessagePanel(new Post(0, 0, "No messages to display.", "", "", -1));
+            JPanel noMessagePanel = createMessagePanel(new Post(0, 0, "No messages to display.", "", "", -1, null));
             messagePanel.add(noMessagePanel);
         }
 
@@ -383,10 +393,10 @@ public class YClient {
         JPanel containerPanel = new JPanel(new BorderLayout());
         containerPanel.add(scrollPane, BorderLayout.CENTER);
 
-        frame.getContentPane().removeAll();
-        frame.getContentPane().add(containerPanel, BorderLayout.CENTER);
-        frame.revalidate();
-        frame.repaint();
+        PostsPanel.removeAll();
+        PostsPanel.add(containerPanel, BorderLayout.CENTER);
+        PostsPanel.revalidate();
+        PostsPanel.repaint();
     }
 
     // private JPanel createMessagePanel(String username, String content, String
@@ -424,14 +434,71 @@ public class YClient {
         editorPane.setText(htmlMessage);
         editorPane.setEditable(false);
         editorPane.setBackground(messagePanel.getBackground());
-
+        int loveCount = 0;
+        int thumbsUpCount = 0;
+        int cryingCount = 0;
+        int angryCount = 0;
+        int laughingCount = 0;
+        if (message.getReactionCountMap() != null) {
+            Map<Integer, Integer> map = message.getReactionCountMap();
+            if (map.containsKey(1)) {
+                loveCount = map.get(1);
+            }
+            if (map.containsKey(2)) {
+                thumbsUpCount = map.get(2);
+            }
+            if (map.containsKey(3)) {
+                cryingCount = map.get(3);
+            }
+            if (map.containsKey(4)) {
+                angryCount = map.get(4);
+            }
+            if (map.containsKey(5)) {
+                laughingCount = map.get(5);
+            }
+        }
         // Emoji buttons
         JPanel emojiPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        // Love Emoji
         JButton loveButton = createEmojiButton("\u2764\uFE0F");
+        JLabel loveLabel = createEmojiCountLabel(loveCount); // Replace 2 with the actual count
+        JPanel lovePanel = new JPanel(new BorderLayout());
+        lovePanel.add(loveButton, BorderLayout.NORTH);
+        lovePanel.add(loveLabel, BorderLayout.SOUTH);
+        emojiPanel.add(lovePanel);
+
+        // Thumbs Up Emoji
         JButton thumbsUpButton = createEmojiButton("\uD83D\uDC4D");
+        JLabel thumbsUpLabel = createEmojiCountLabel(thumbsUpCount);
+        JPanel thumbsUpPanel = new JPanel(new BorderLayout());
+        thumbsUpPanel.add(thumbsUpButton, BorderLayout.NORTH);
+        thumbsUpPanel.add(thumbsUpLabel, BorderLayout.SOUTH);
+        emojiPanel.add(thumbsUpPanel);
+
+        // Crying Emoji
         JButton cryingButton = createEmojiButton("\uD83D\uDE22");
+        JLabel cryingLabel = createEmojiCountLabel(cryingCount);
+        JPanel cryingPanel = new JPanel(new BorderLayout());
+        cryingPanel.add(cryingButton, BorderLayout.NORTH);
+        cryingPanel.add(cryingLabel, BorderLayout.SOUTH);
+        emojiPanel.add(cryingPanel);
+
+        // Angry Emoji
         JButton angryButton = createEmojiButton("\uD83D\uDE20");
+        JLabel angryLabel = createEmojiCountLabel(angryCount);
+        JPanel angryPanel = new JPanel(new BorderLayout());
+        angryPanel.add(angryButton, BorderLayout.NORTH);
+        angryPanel.add(angryLabel, BorderLayout.SOUTH);
+        emojiPanel.add(angryPanel);
+
+        // Laughing Emoji
         JButton laughingButton = createEmojiButton("\uD83D\uDE02");
+        JLabel laughingLabel = createEmojiCountLabel(laughingCount);
+        JPanel laughingPanel = new JPanel(new BorderLayout());
+        laughingPanel.add(laughingButton, BorderLayout.NORTH);
+        laughingPanel.add(laughingLabel, BorderLayout.SOUTH);
+        emojiPanel.add(laughingPanel);
 
         int reaction = message.getReaction();
         loveButton.setBackground((reaction == 1) ? Color.RED : null);
@@ -443,14 +510,34 @@ public class YClient {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (loveButton.getBackground() == Color.RED) {
-                    RemoveReactionEmojiButtons.add(new RemoveReactionEmojiButton(message.getID(), loveButton));
+                    RemoveReactionEmojiButtons
+                            .add(new RemoveReactionEmojiButton(message.getID(), loveButton, loveLabel));
                     handleRemoveReactionRequest(message.getID(), userId);
                 } else {
-                    handlePostReaction(new Reaction(-1, message.getID(), userId, 1));
+                    JButton previousButton = null;
+                    JButton newButton = loveButton;
+                    JLabel previousLabel = null;
+                    JLabel newLabel = loveLabel;
+                    if (loveButton.getBackground() == Color.RED) {
+                        previousButton = loveButton;
+                        previousLabel = loveLabel;
+                    } else if (thumbsUpButton.getBackground() == Color.RED) {
+                        previousButton = thumbsUpButton;
+                        previousLabel = thumbsUpLabel;
+                    } else if (cryingButton.getBackground() == Color.RED) {
+                        previousButton = cryingButton;
+                        previousLabel = cryingLabel;
+                    } else if (angryButton.getBackground() == Color.RED) {
+                        previousButton = angryButton;
+                        previousLabel = angryLabel;
+                    } else if (laughingButton.getBackground() == Color.RED) {
+                        previousButton = laughingButton;
+                        previousLabel = laughingLabel;
+                    }
+
                     emojiButtons
-                            .add(new EmojiButtons(message.getID(), loveButton, thumbsUpButton, cryingButton,
-                                    angryButton,
-                                    laughingButton));
+                            .add(new EmojiButtons(message.getID(), previousButton, newButton, previousLabel, newLabel));
+                    handlePostReaction(new Reaction(-1, message.getID(), userId, 1));
 
                 }
 
@@ -460,14 +547,34 @@ public class YClient {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (thumbsUpButton.getBackground() == Color.RED) {
-                    RemoveReactionEmojiButtons.add(new RemoveReactionEmojiButton(message.getID(), thumbsUpButton));
+                    RemoveReactionEmojiButtons
+                            .add(new RemoveReactionEmojiButton(message.getID(), thumbsUpButton, thumbsUpLabel));
                     handleRemoveReactionRequest(message.getID(), userId);
                 } else {
-                    handlePostReaction(new Reaction(-1, message.getID(), userId, 2));
+                    JButton previousButton = null;
+                    JButton newButton = thumbsUpButton;
+                    JLabel previousLabel = null;
+                    JLabel newLabel = thumbsUpLabel;
+                    if (loveButton.getBackground() == Color.RED) {
+                        previousButton = loveButton;
+                        previousLabel = loveLabel;
+                    } else if (thumbsUpButton.getBackground() == Color.RED) {
+                        previousButton = thumbsUpButton;
+                        previousLabel = thumbsUpLabel;
+                    } else if (cryingButton.getBackground() == Color.RED) {
+                        previousButton = cryingButton;
+                        previousLabel = cryingLabel;
+                    } else if (angryButton.getBackground() == Color.RED) {
+                        previousButton = angryButton;
+                        previousLabel = angryLabel;
+                    } else if (laughingButton.getBackground() == Color.RED) {
+                        previousButton = laughingButton;
+                        previousLabel = laughingLabel;
+                    }
                     emojiButtons
-                            .add(new EmojiButtons(message.getID(), loveButton, thumbsUpButton, cryingButton,
-                                    angryButton,
-                                    laughingButton));
+                            .add(new EmojiButtons(message.getID(), previousButton, newButton, previousLabel, newLabel));
+
+                    handlePostReaction(new Reaction(-1, message.getID(), userId, 2));
 
                 }
             }
@@ -476,14 +583,34 @@ public class YClient {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (cryingButton.getBackground() == Color.RED) {
-                    RemoveReactionEmojiButtons.add(new RemoveReactionEmojiButton(message.getID(), cryingButton));
+                    RemoveReactionEmojiButtons
+                            .add(new RemoveReactionEmojiButton(message.getID(), cryingButton, cryingLabel));
                     handleRemoveReactionRequest(message.getID(), userId);
                 } else {
-                    handlePostReaction(new Reaction(-1, message.getID(), userId, 3));
+                    JButton previousButton = null;
+                    JButton newButton = cryingButton;
+                    JLabel previousLabel = null;
+                    JLabel newLabel = cryingLabel;
+                    if (loveButton.getBackground() == Color.RED) {
+                        previousButton = loveButton;
+                        previousLabel = loveLabel;
+                    } else if (thumbsUpButton.getBackground() == Color.RED) {
+                        previousButton = thumbsUpButton;
+                        previousLabel = thumbsUpLabel;
+                    } else if (cryingButton.getBackground() == Color.RED) {
+                        previousButton = cryingButton;
+                        previousLabel = cryingLabel;
+                    } else if (angryButton.getBackground() == Color.RED) {
+                        previousButton = angryButton;
+                        previousLabel = angryLabel;
+                    } else if (laughingButton.getBackground() == Color.RED) {
+                        previousButton = laughingButton;
+                        previousLabel = laughingLabel;
+                    }
                     emojiButtons
-                            .add(new EmojiButtons(message.getID(), loveButton, thumbsUpButton, cryingButton,
-                                    angryButton,
-                                    laughingButton));
+                            .add(new EmojiButtons(message.getID(), previousButton, newButton, previousLabel, newLabel));
+
+                    handlePostReaction(new Reaction(-1, message.getID(), userId, 3));
 
                 }
             }
@@ -492,14 +619,34 @@ public class YClient {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (angryButton.getBackground() == Color.RED) {
-                    RemoveReactionEmojiButtons.add(new RemoveReactionEmojiButton(message.getID(), angryButton));
+                    RemoveReactionEmojiButtons
+                            .add(new RemoveReactionEmojiButton(message.getID(), angryButton, angryLabel));
                     handleRemoveReactionRequest(message.getID(), userId);
                 } else {
-                    handlePostReaction(new Reaction(-1, message.getID(), userId, 4));
+                    JButton previousButton = null;
+                    JButton newButton = angryButton;
+                    JLabel previousLabel = null;
+                    JLabel newLabel = angryLabel;
+                    if (loveButton.getBackground() == Color.RED) {
+                        previousButton = loveButton;
+                        previousLabel = loveLabel;
+                    } else if (thumbsUpButton.getBackground() == Color.RED) {
+                        previousButton = thumbsUpButton;
+                        previousLabel = thumbsUpLabel;
+                    } else if (cryingButton.getBackground() == Color.RED) {
+                        previousButton = cryingButton;
+                        previousLabel = cryingLabel;
+                    } else if (angryButton.getBackground() == Color.RED) {
+                        previousButton = angryButton;
+                        previousLabel = angryLabel;
+                    } else if (laughingButton.getBackground() == Color.RED) {
+                        previousButton = laughingButton;
+                        previousLabel = laughingLabel;
+                    }
                     emojiButtons
-                            .add(new EmojiButtons(message.getID(), loveButton, thumbsUpButton, cryingButton,
-                                    angryButton,
-                                    laughingButton));
+                            .add(new EmojiButtons(message.getID(), previousButton, newButton, previousLabel, newLabel));
+
+                    handlePostReaction(new Reaction(-1, message.getID(), userId, 4));
 
                 }
             }
@@ -508,23 +655,38 @@ public class YClient {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (laughingButton.getBackground() == Color.RED) {
-                    RemoveReactionEmojiButtons.add(new RemoveReactionEmojiButton(message.getID(), laughingButton));
+                    RemoveReactionEmojiButtons
+                            .add(new RemoveReactionEmojiButton(message.getID(), laughingButton, laughingLabel));
                     handleRemoveReactionRequest(message.getID(), userId);
                 } else {
-                    handlePostReaction(new Reaction(-1, message.getID(), userId, 5));
+                    JButton previousButton = null;
+                    JButton newButton = laughingButton;
+                    JLabel previousLabel = null;
+                    JLabel newLabel = laughingLabel;
+                    if (loveButton.getBackground() == Color.RED) {
+                        previousButton = loveButton;
+                        previousLabel = loveLabel;
+                    } else if (thumbsUpButton.getBackground() == Color.RED) {
+                        previousButton = thumbsUpButton;
+                        previousLabel = thumbsUpLabel;
+                    } else if (cryingButton.getBackground() == Color.RED) {
+                        previousButton = cryingButton;
+                        previousLabel = cryingLabel;
+                    } else if (angryButton.getBackground() == Color.RED) {
+                        previousButton = angryButton;
+                        previousLabel = angryLabel;
+                    } else if (laughingButton.getBackground() == Color.RED) {
+                        previousButton = laughingButton;
+                        previousLabel = laughingLabel;
+                    }
                     emojiButtons
-                            .add(new EmojiButtons(message.getID(), loveButton, thumbsUpButton, cryingButton,
-                                    angryButton,
-                                    laughingButton));
+                            .add(new EmojiButtons(message.getID(), previousButton, newButton, previousLabel, newLabel));
+
+                    handlePostReaction(new Reaction(-1, message.getID(), userId, 5));
 
                 }
             }
         });
-        emojiPanel.add(loveButton);
-        emojiPanel.add(thumbsUpButton);
-        emojiPanel.add(cryingButton);
-        emojiPanel.add(angryButton);
-        emojiPanel.add(laughingButton);
 
         JPanel viewCommentsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 
@@ -538,6 +700,14 @@ public class YClient {
         messagePanel.add(viewCommentsPanel);
 
         return messagePanel;
+    }
+
+    private JLabel createEmojiCountLabel(int count) {
+        JLabel label = new JLabel(String.valueOf(count));
+        label.setHorizontalAlignment(JLabel.CENTER);
+        label.setFont(new Font("Arial", Font.PLAIN, 10)); // Set a smaller font size
+
+        return label;
     }
 
     private JButton createEmojiButton(String emoji) {
@@ -554,13 +724,20 @@ public class YClient {
         Message msg = response.getMessage();
         JPanel messageItemPanel = createMessagePanel(
                 new Post(msg.getID(), msg.getUserID(), msg.getUsername(), msg.getContent(), msg.getDate(),
-                        msg.getReaction()));
+                        msg.getReaction(), msg.getReactionCountMap()));
         messagePanel.add(messageItemPanel);
     }
 
     private void showPostLoginUI(List<Message> userMessages, List<Message> messagesOfInterest) {
         frame.getContentPane().removeAll();
+        frame = new JFrame("Y Platform Client");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(700, 800);
         frame.setLayout(new BorderLayout());
+
+        JTabbedPane tabbedPane = new JTabbedPane();
+        PostsPanel = new JPanel();
+        PostsPanel.setLayout(new BorderLayout());
 
         JPanel postLoginPanel = new JPanel(new BorderLayout());
         postLoginPanel.add(createPostPanel(), BorderLayout.NORTH);
@@ -569,9 +746,14 @@ public class YClient {
         // Update message display within this method
         updateMessagesDisplay(userMessages, messagesOfInterest);
 
-        frame.getContentPane().add(postLoginPanel, BorderLayout.PAGE_START);
-        frame.revalidate();
-        frame.repaint();
+        PostsPanel.add(postLoginPanel, BorderLayout.PAGE_START);
+        PostsPanel.revalidate();
+        PostsPanel.repaint();
+        tabbedPane.addTab("Posts", PostsPanel);
+        chatPanel = createChatPanel();
+        tabbedPane.addTab("Chat", chatPanel);
+        frame.getContentPane().add(tabbedPane, BorderLayout.CENTER);
+        frame.setVisible(true);
     }
 
     private void handleFollow() {
@@ -594,7 +776,7 @@ public class YClient {
             for (Message msg : response.getMessages()) {
                 JPanel messageItemPanel = createMessagePanel(
                         new Post(msg.getID(), msg.getUserID(), msg.getUsername(), msg.getContent(), msg.getDate(),
-                                msg.getReaction()));
+                                msg.getReaction(), msg.getReactionCountMap()));
                 messagePanel.add(messageItemPanel);
             }
         }
@@ -613,7 +795,7 @@ public class YClient {
             for (Message msg : messagesOfInterest) {
                 JPanel messageItemPanel = createMessagePanel(
                         new Post(msg.getID(), msg.getUserID(), msg.getUsername(), msg.getContent(), msg.getDate(),
-                                msg.getReaction()));
+                                msg.getReaction(), msg.getReactionCountMap()));
                 messagePanel.add(messageItemPanel);
             }
         }
@@ -625,7 +807,7 @@ public class YClient {
 
         JPanel messageItemPanel = createMessagePanel(
                 new Post(msg.getID(), msg.getUserID(), msg.getUsername(), msg.getContent(), msg.getDate(),
-                        msg.getReaction()));
+                        msg.getReaction(), msg.getReactionCountMap()));
         messagePanel.add(messageItemPanel);
 
     }
@@ -645,18 +827,16 @@ public class YClient {
         for (EmojiButtons e : emojiButtons) {
             if (e.post_id == res.getReaction().getPost_id()) {
                 if (res.isOldReactionDeleted() && res.isNewReactionAdded()) {
-                    int reaction = res.getReaction().getEmojiNumber();
-                    e.getLoveButton().setBackground((reaction == 1) ? Color.RED : null);
-                    e.getThumbsUpButton().setBackground((reaction == 2) ? Color.RED : null);
-                    e.getCryingButton().setBackground((reaction == 3) ? Color.RED : null);
-                    e.getAngryButton().setBackground((reaction == 4) ? Color.RED : null);
-                    e.getLaughingButton().setBackground((reaction == 5) ? Color.RED : null);
+                    if (e.getPreviousButton() != null)
+                        e.getPreviousButton().setBackground(null);
+                    e.getNewButton().setBackground(Color.RED);
+                    if (e.getPreviousLabel() != null)
+                        e.getPreviousLabel().setText(Integer.parseInt(e.getPreviousLabel().getText()) - 1 + "");
+                    e.getNewLabel().setText(Integer.parseInt(e.getNewLabel().getText()) + 1 + "");
                 } else if (res.isOldReactionDeleted()) {
-                    e.getLoveButton().setBackground(null);
-                    e.getThumbsUpButton().setBackground(null);
-                    e.getCryingButton().setBackground(null);
-                    e.getAngryButton().setBackground(null);
-                    e.getLaughingButton().setBackground(null);
+                    e.getPreviousButton().setBackground(null);
+                    e.getPreviousLabel().setText(Integer.parseInt(e.getPreviousLabel().getText()) - 1 + "");
+
                     JOptionPane.showMessageDialog(frame, "Failed to Post Reaction.", "Post Reaction",
                             JOptionPane.INFORMATION_MESSAGE);
                 } else {
@@ -675,10 +855,189 @@ public class YClient {
             for (RemoveReactionEmojiButton b : RemoveReactionEmojiButtons) {
                 if (b.getPost_id() == res.getPost_id()) {
                     b.getButton().setBackground(null);
+                    b.getLabel().setText(Integer.parseInt(b.getLabel().getText()) - 1 + "");
                     RemoveReactionEmojiButtons.remove(b);
                     break;
                 }
             }
+        }
+    }
+
+    private static JPanel createChatPanel() {
+        JPanel chatPanel = new JPanel(new BorderLayout());
+
+        List<Chat> chats = createDummyChats();
+        DefaultListModel<Chat> chatListModel = new DefaultListModel<>();
+
+        for (Chat chat : chats) {
+            chatListModel.addElement(chat);
+        }
+
+        JList<Chat> chatList = new JList<>(chatListModel);
+        chatList.setCellRenderer(new ChatListCellRenderer());
+
+        JScrollPane scrollPane = new JScrollPane(chatList);
+        chatPanel.add(scrollPane, BorderLayout.CENTER);
+
+        chatList.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                JList<Chat> list = (JList<Chat>) evt.getSource();
+                if (evt.getClickCount() == 2) {
+                    int index = list.locationToIndex(evt.getPoint());
+                    if (index >= 0) {
+                        Chat selectedChat = list.getModel().getElementAt(index);
+                        openChatWindow(selectedChat);
+                    }
+                }
+            }
+        });
+
+        return chatPanel;
+    }
+
+    private static void openChatWindow(Chat chat) {
+        JFrame chatFrame = new JFrame(chat.getName() + " Chat");
+        chatFrame.setSize(400, 500);
+        chatFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        JPanel chatContainer = new JPanel();
+        chatContainer.setLayout(new GridBagLayout());
+
+        JTextPane chatArea = new JTextPane();
+        chatArea.setEditable(false);
+
+        JScrollPane scrollPane = new JScrollPane(chatArea);
+        GridBagConstraints chatConstraints = new GridBagConstraints();
+        chatConstraints.gridx = 0;
+        chatConstraints.gridy = 0;
+        chatConstraints.weightx = 1.0;
+        chatConstraints.weighty = 1.0;
+        chatConstraints.fill = GridBagConstraints.BOTH;
+        chatContainer.add(scrollPane, chatConstraints);
+
+        JTextField messageField = new JTextField();
+        JButton sendButton = new JButton("Send");
+
+        sendButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String message = messageField.getText();
+                if (!message.isEmpty()) {
+                    addChatToPane(chatArea, chat.getUserName(), message);
+                    messageField.setText("");
+                }
+            }
+        });
+
+        JPanel inputPanel = new JPanel(new BorderLayout());
+        inputPanel.add(messageField, BorderLayout.CENTER);
+        inputPanel.add(sendButton, BorderLayout.EAST);
+
+        GridBagConstraints inputConstraints = new GridBagConstraints();
+        inputConstraints.gridx = 0;
+        inputConstraints.gridy = 1;
+        inputConstraints.weightx = 1.0;
+        inputConstraints.fill = GridBagConstraints.HORIZONTAL;
+        chatContainer.add(inputPanel, inputConstraints);
+
+        chatFrame.add(chatContainer, BorderLayout.CENTER);
+        chatFrame.setVisible(true);
+    }
+
+    private static void addChatToPane(JTextPane chatArea, String username, String message) {
+        StyledDocument doc = chatArea.getStyledDocument();
+        SimpleAttributeSet keyWord = new SimpleAttributeSet();
+        StyleConstants.setForeground(keyWord, Color.BLACK);
+
+        try {
+            // Create a border for the chat
+            Border border = BorderFactory.createLineBorder(Color.GRAY, 1);
+
+            // Create a panel to contain the chat and set the border
+            JPanel chatPanel = new JPanel(new BorderLayout());
+            chatPanel.setBorder(border);
+
+            // Add username to the panel
+            JLabel usernameLabel = new JLabel(username);
+            chatPanel.add(usernameLabel, BorderLayout.NORTH);
+
+            // Add message to the panel
+            JTextPane chatMessage = new JTextPane();
+            chatMessage.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+            chatMessage.setEditable(false);
+            chatMessage.setText(message);
+            chatPanel.add(chatMessage, BorderLayout.CENTER);
+
+            // Add date in small font to the panel
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            String dateStr = dateFormat.format(new Date());
+            JLabel dateLabel = new JLabel(dateStr);
+            dateLabel.setFont(new Font(dateLabel.getFont().getName(), Font.PLAIN, 10));
+            chatPanel.add(dateLabel, BorderLayout.SOUTH);
+
+            // Insert the panel into the JTextPane
+            chatArea.insertComponent(chatPanel);
+
+            // Insert a new line after each chat
+            doc.insertString(doc.getLength(), "\n", null);
+
+            // Scroll to the bottom of the chatArea
+            chatArea.setCaretPosition(doc.getLength());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static String getCurrentDateFormatted() {
+        // You can use your preferred date formatting here
+        return java.time.LocalDateTime.now().toString();
+    }
+
+    private static List<Chat> createDummyChats() {
+        List<Chat> chats = new ArrayList<>();
+        chats.add(new Chat("John Doe", "john.doe@example.com"));
+        chats.add(new Chat("Alice Smith", "alice.smith@example.com"));
+        chats.add(new Chat("Bob Johnson", "bob.johnson@example.com"));
+        return chats;
+    }
+
+    static class Chat {
+        private String name;
+        private String userName;
+
+        public Chat(String name, String userName) {
+            this.name = name;
+            this.userName = userName;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getUserName() {
+            return userName;
+        }
+
+        @Override
+        public String toString() {
+            return name + " (" + userName + ")";
+        }
+    }
+
+    static class ChatListCellRenderer extends DefaultListCellRenderer {
+        @Override
+        public Component getListCellRendererComponent(
+                JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+
+            if (value instanceof Chat) {
+                Chat chat = (Chat) value;
+                setText("<html><b>" + chat.getName() + "</b><br><font color='#888888'>"
+                        + chat.getUserName() + "</font></html>");
+            }
+
+            return this;
         }
     }
 
@@ -696,14 +1055,17 @@ class Post {
     private int ID;
     private int userID;
     private int reaction;
+    private Map<Integer, Integer> reactionCountMap;
 
-    public Post(int iD, int userID, String username, String content, String date, int reaction) {
+    public Post(int iD, int userID, String username, String content, String date, int reaction,
+            Map<Integer, Integer> reactionCountMap) {
         this.username = username;
         this.content = content;
         this.date = date;
         ID = iD;
         this.userID = userID;
         this.reaction = reaction;
+        this.reactionCountMap = reactionCountMap;
     }
 
     public String getUsername() {
@@ -754,6 +1116,14 @@ class Post {
         this.reaction = reaction;
     }
 
+    public Map<Integer, Integer> getReactionCountMap() {
+        return reactionCountMap;
+    }
+
+    public void setReactionCountMap(Map<Integer, Integer> reactionCountMap) {
+        this.reactionCountMap = reactionCountMap;
+    }
+
 }
 
 class CommentPanel {
@@ -785,20 +1155,17 @@ class CommentPanel {
 
 class EmojiButtons {
     int post_id;
-    private JButton loveButton;
-    private JButton thumbsUpButton;
-    private JButton cryingButton;
-    private JButton angryButton;
-    private JButton laughingButton;
+    private JButton previousButton;
+    private JButton newButton;
+    private JLabel previousLabel;
+    private JLabel newLabel;
 
-    public EmojiButtons(int post_id, JButton loveButton, JButton thumbsUpButton, JButton cryingButton,
-            JButton angryButton, JButton laughingButton) {
+    public EmojiButtons(int post_id, JButton previousButton, JButton newButton, JLabel previousLabel, JLabel newLabel) {
         this.post_id = post_id;
-        this.loveButton = loveButton;
-        this.thumbsUpButton = thumbsUpButton;
-        this.cryingButton = cryingButton;
-        this.angryButton = angryButton;
-        this.laughingButton = laughingButton;
+        this.previousButton = previousButton;
+        this.newButton = newButton;
+        this.previousLabel = previousLabel;
+        this.newLabel = newLabel;
     }
 
     public int getPost_id() {
@@ -809,44 +1176,36 @@ class EmojiButtons {
         this.post_id = post_id;
     }
 
-    public JButton getLoveButton() {
-        return loveButton;
+    public JButton getPreviousButton() {
+        return previousButton;
     }
 
-    public void setLoveButton(JButton loveButton) {
-        this.loveButton = loveButton;
+    public void setPreviousButton(JButton previousButton) {
+        this.previousButton = previousButton;
     }
 
-    public JButton getThumbsUpButton() {
-        return thumbsUpButton;
+    public JButton getNewButton() {
+        return newButton;
     }
 
-    public void setThumbsUpButton(JButton thumbsUpButton) {
-        this.thumbsUpButton = thumbsUpButton;
+    public void setNewButton(JButton newButton) {
+        this.newButton = newButton;
     }
 
-    public JButton getCryingButton() {
-        return cryingButton;
+    public JLabel getPreviousLabel() {
+        return previousLabel;
     }
 
-    public void setCryingButton(JButton cryingButton) {
-        this.cryingButton = cryingButton;
+    public void setPreviousLabel(JLabel previousLabel) {
+        this.previousLabel = previousLabel;
     }
 
-    public JButton getAngryButton() {
-        return angryButton;
+    public JLabel getNewLabel() {
+        return newLabel;
     }
 
-    public void setAngryButton(JButton angryButton) {
-        this.angryButton = angryButton;
-    }
-
-    public JButton getLaughingButton() {
-        return laughingButton;
-    }
-
-    public void setLaughingButton(JButton laughingButton) {
-        this.laughingButton = laughingButton;
+    public void setNewLabel(JLabel newLabel) {
+        this.newLabel = newLabel;
     }
 
 }
@@ -854,10 +1213,12 @@ class EmojiButtons {
 class RemoveReactionEmojiButton {
     private int post_id;
     private JButton button;
+    private JLabel label;
 
-    public RemoveReactionEmojiButton(int post_id, JButton button) {
+    public RemoveReactionEmojiButton(int post_id, JButton button, JLabel label) {
         this.post_id = post_id;
         this.button = button;
+        this.label = label;
     }
 
     public int getPost_id() {
@@ -874,6 +1235,14 @@ class RemoveReactionEmojiButton {
 
     public void setButton(JButton button) {
         this.button = button;
+    }
+
+    public JLabel getLabel() {
+        return label;
+    }
+
+    public void setLabel(JLabel label) {
+        this.label = label;
     }
 
 }

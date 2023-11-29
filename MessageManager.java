@@ -4,7 +4,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.sql.Statement;
 
 public class MessageManager {
@@ -53,10 +55,10 @@ public class MessageManager {
                     throw new SQLException("Creating message failed, no ID obtained.");
                 }
             }
-            return new Message(userId, postedMessageID, username, content, postedAt, -1);
+            return new Message(postedMessageID, userId, username, content, postedAt, -1, null);
         } catch (SQLException e) {
             e.printStackTrace();
-            return new Message(userId, -1, username, content, "", -1);
+            return new Message(-1, userId, username, content, "", -1, null);
         }
     }
 
@@ -72,7 +74,8 @@ public class MessageManager {
                 String date = resultSet.getString("posted_at");
                 int ID = resultSet.getInt("id");
                 int reaction = resultSet.getInt("reaction");
-                messages.add(new Message(userId, ID, username, content, date, reaction));
+                Map<Integer, Integer> reactionCountMap = getPostReactionsCount(ID);
+                messages.add(new Message(ID, userId, username, content, date, reaction, reactionCountMap));
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -116,7 +119,9 @@ public class MessageManager {
                     int user_id = rs.getInt("user_id");
                     int id = rs.getInt("post_id");
                     int reaction = rs.getInt("reaction");
-                    messages.add(new Message(user_id, id, username, content, date, reaction));
+                    Map<Integer, Integer> reactionCountMap = getPostReactionsCount(id);
+                    // System.out.println(reactionCountMap.size());
+                    messages.add(new Message(id, user_id, username, content, date, reaction, reactionCountMap));
                 }
             }
         } catch (SQLException e) {
@@ -170,7 +175,8 @@ public class MessageManager {
                     int user_id = rs.getInt("user_id");
                     int id = rs.getInt("id");
                     int reaction = rs.getInt("reaction");
-                    messages.add(new Message(user_id, id, username, content, date, reaction));
+                    Map<Integer, Integer> reactionCountMap = getPostReactionsCount(id);
+                    messages.add(new Message(id, user_id, username, content, date, reaction, reactionCountMap));
                 }
             }
             success = true;
@@ -248,8 +254,7 @@ public class MessageManager {
 
             statement.setInt(1, reaction.getPost_id());
             statement.setInt(2, reaction.getAuthor_id());
-
-            int rowsAffected = statement.executeUpdate();
+            statement.executeUpdate();
 
             oldReactionDeleted = true;
 
@@ -260,7 +265,6 @@ public class MessageManager {
         String sql = "INSERT INTO reactions (post_id, author_id, reaction) VALUES (?, ?, ?);";
         try (Connection connection = connect();
                 PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-
             statement.setInt(1, reaction.getPost_id());
             statement.setInt(2, reaction.getAuthor_id());
             statement.setInt(3, reaction.getEmojiNumber());
@@ -308,5 +312,28 @@ public class MessageManager {
             e.printStackTrace();
         }
         return new RemoveReactionResponse(oldReactionDeleted, post_id, user_id);
+    }
+
+    public Map<Integer, Integer> getPostReactionsCount(int postId) {
+        String sql = "SELECT reaction, COUNT(*) as reaction_count FROM reactions WHERE post_id = ? GROUP BY reaction";
+
+        Map<Integer, Integer> reactionCountMap = new HashMap<>();
+
+        try (Connection connection = connect();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, postId);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    int reaction = resultSet.getInt("reaction");
+                    int reactionCount = resultSet.getInt("reaction_count");
+                    reactionCountMap.put(reaction, reactionCount);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace(); // Handle the exception according to your application's needs
+        }
+
+        return reactionCountMap;
     }
 }
